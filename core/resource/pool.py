@@ -9,6 +9,9 @@
     一组测试资源的合集,测试平台可以对测试资源池进行统一的管理,我们可以给测试资源池设计一些功能,提供给测试用例开发者调用
 """
 import json
+import os
+
+from core.config.setting import static_setting, SettingBase
 
 # =====================================
 # 配置接口:管理测试资源的接口, 是代码用来向测试资源发送和接收信息的重要途径
@@ -65,13 +68,13 @@ class ResourceDevice:
         """
         # 判断类型是否进行过实例化注册
         if self.type not in _resource_port_mapping:
-            raise ResourceError(f"type {self.type} is not registered")
+            raise ResourceError(f"类型[ {self.type} ]未注册!")
         return _resource_device_mapping[self.type](self)
 
     def add_port(self, name, *args, **kwargs):
         if name in self.ports:
             # 以 f开头表示在字符串内支持大括号内的python表达式
-            raise Exception(f"Port Name {name} already exists")
+            raise Exception(f"端口名[ {name} ]已经存在")
         self.ports[f"{name}"] = DevicePort(self, name, args, kwargs)
 
     def to_dict(self):
@@ -104,6 +107,15 @@ class ResourceDevice:
                 setattr(ret, key, value)
         return ret
 
+
+@static_setting.setting("ResourceSetting")
+class ResourceSetting(SettingBase):
+    """资源配置模块的配置类
+    当资源模块被引用时,会执行装饰器函数,将该类自动添加到static_setting的setting属性中
+    """
+    file_name = "resource_setting.setting"
+    resource_path = os.path.join(os.getcwd(), "test_resource")
+    auto_connect = False
 
 class DevicePort:
     """ 代表设备的连接端口
@@ -183,7 +195,7 @@ class ResourcePool:
 
     def add_device(self, device_name, **kwargs):
         if device_name in self.topology:
-            raise ResourceError(f"devide {device_name} already exists")
+            raise ResourceError(f"设备[ {device_name} ]已经存在")
         self.topology[device_name] = ResourceDevice(device_name)
 
     def reserve(self):
@@ -194,7 +206,7 @@ class ResourcePool:
         @return:
         """
         if self.file_name is None:
-            raise ResourceError("load a resource file first")
+            raise ResourceError("首次载入资源文件")
         self.load(self.file_name, self.owner)
         self.reserved = {"owner": self.owner,
                          "date": time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
@@ -207,7 +219,7 @@ class ResourcePool:
         @return:
         """
         if self.file_name is None:
-            raise ResourceError("load a resource file first")
+            raise ResourceError("首次载入资源文件")
         self.load(self.file_name)
         self.reserved = None
         self.save(self.file_name)
@@ -221,7 +233,7 @@ class ResourcePool:
         """
         # 检查文件是否存在
         if not os.path.exists(filename):
-            raise ResourceError(f"Cannot find file {filename}")
+            raise ResourceError(f"无法找到文件[ {filename} ]")
 
         # 初始化
         self.file_name = filename
@@ -237,7 +249,7 @@ class ResourcePool:
         if "reserved" in json_object and \
                 json_object['reserved'] is not None and \
                 json_object['reserved']['owner'] != owner:
-            raise ResourceError(f"Resource is reserved by {json_object['reserved']['owner']}")
+            raise ResourceError(f"源文件已经被[ {json_object['reserved']['owner']} ]占用")
 
         self.owner = owner
 
@@ -248,7 +260,7 @@ class ResourcePool:
         """
         # 检查文件是否存在
         if not os.path.exists(filename):
-            raise ResourceError(f"Cannot find file {filename}")
+            raise ResourceError(f"查无文件[ {filename} ]")
 
         # 初始化
         self.topology.clear()

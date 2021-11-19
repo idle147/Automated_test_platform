@@ -1,0 +1,10 @@
+{
+  "modules": [
+    {
+      "name": "模块名",
+      "package": "模块路径",
+      "setting_file": "模块动态配置文件名",
+      "setting_path": "模块动态配置文件路径"
+    }
+  ]
+}
