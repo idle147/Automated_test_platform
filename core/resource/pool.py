@@ -10,6 +10,41 @@
 """
 import json
 
+# =====================================
+# 配置接口:管理测试资源的接口, 是代码用来向测试资源发送和接收信息的重要途径
+# 方法: 1. 对响应的库进行实例化, 需要调用的时候再进行封装(使用回调函数)
+#      2. 实例化的方法不传递任何参数,把需要调用的方法提前注册,生成资源类型和实例化方法之间的映射关系
+# =====================================
+# 保存资源类型和实例化方法的映射关系
+_resource_device_mapping = {}
+_resource_port_mapping = {}
+
+
+def register_resource(category, resource_type, comm_callback):
+    """
+    注册配置接口实例化的方法或类
+    @param category:
+    @param resource_type:
+    @param comm_callback:
+    @return:
+    """
+    if category == "device":
+        _resource_port_mapping[resource_type] = comm_callback
+    elif category == "port":
+        _resource_port_mapping[resource_type] = comm_callback
+
+
+class ResourceError(Exception):
+    """
+    自定义异常处理
+    """
+
+    def __init__(self, msg):
+        self.message = msg
+
+    def __str__(self):  # 异常的字符串信息
+        return self.message
+
 
 class ResourceDevice:
     """ 代表所有测试资源设备的配置类，字段动态定义
@@ -23,6 +58,15 @@ class ResourceDevice:
         self.type = kwargs.get("type", None)
         self.description = kwargs.get("description", None)
         self.ports = dict()
+
+    def get_comm_instance(self):
+        """
+        @return: 获取配置接口实例对象
+        """
+        # 判断类型是否进行过实例化注册
+        if self.type not in _resource_port_mapping:
+            raise ResourceError(f"type {self.type} is not registered")
+        return _resource_device_mapping[self.type](self)
 
     def add_port(self, name, *args, **kwargs):
         if name in self.ports:
@@ -71,7 +115,7 @@ class DevicePort:
         self.parent = parent_device
         self.name = name
         self.description = kwargs.get("description", None)
-        self.remote_ports = list()
+        self.remote_ports = []
 
     def to_dict(self):
         """序列化方法
@@ -87,7 +131,7 @@ class DevicePort:
             if key == "parent":
                 ret[key] = value.name
             elif key == "remote_ports":
-                ret[key] = list()
+                ret[key] = []
                 for remote_port in value:
                     # 使用device的名称和port的名称来表示远端的端口
                     # 在反序列化的时候可以方便地找到相应的对象实例
@@ -238,23 +282,49 @@ class ResourcePool:
                 root_object['device'][device_key] = device.to_dict()
             json.dump(root_object, file, indent=4)
 
-    def collect_device(self, device_type, count):
+    def collect_device(self, device_type, count, constraints=[]):
         """
-        获取资源设备信息
+        获取 指定数量的 资源设备信息
+        @param device_type: 获取的资源设备的信息
+        @param count: 获取的资源设备的数量
+        @param constraints: 约束类对象, 对测试资源进行合法性校验
+        @return:
+        """
+        ret = []
+        for key, value in self.topology.items():
+            if value.type == device_type:
+                # 判断测试资源是否符合相应的约束
+                for constraint in constraints:
+                    if not constraint.is_meet(value):
+                        break
+                else:
+                    ret.append(value)
+            if len(ret) > count:
+                return ret
+        else:  # 如果条件一直不满足，则执行该语句
+            return []
+
+    def collect_device(self, device_type, constraints=[]):
+        """
+        获取所有的资源设备信息
         @param device_type: 获取的资源设备的信息
         @param count: 获取的资源设备的数量
         @return:
         """
-        ret = list()
+        ret = []
         for key, value in self.topology.items():
             if value.type == device_type:
-                ret.append(value)
-            if len(ret) > count:
-                return ret
-        else:
-            return list()
+                # 判断测试资源是否符合相应的约束
+                for constraint in constraints:
+                    if not constraint.is_meet(value):
+                        break
+                else:
+                    ret.append(value)
+        return ret
+
 
 if __name__ == '__main__':
+    # 创建实例化对象
     switch = ResourceDevice(name="switch1")
     switch.add_port("ETH1/1")
     switch.add_port("ETH1/2")
@@ -263,6 +333,7 @@ if __name__ == '__main__':
     switch2.add_port("ETH1/1")
     switch2.add_port("ETH1/2")
 
+    # 添加对象之间的交互关系
     switch.ports['ETH1/1'].remote_ports.append(switch2.ports['ETH1/1'])
     switch2.ports['ETH1/1'].remote_ports.append(switch.ports['ETH1/1'])
 
