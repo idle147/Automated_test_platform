@@ -10,6 +10,8 @@
 """
 import json
 import os
+import time
+from abc import ABCMeta, abstractmethod
 
 from core.config.setting import static_setting, SettingBase
 
@@ -21,6 +23,26 @@ from core.config.setting import static_setting, SettingBase
 # 保存资源类型和实例化方法的映射关系
 _resource_device_mapping = {}
 _resource_port_mapping = {}
+
+
+class ResourceError(Exception):
+    """
+    自定义异常处理
+    """
+
+    def __init__(self, msg):
+        self.message = msg
+
+    def __str__(self):  # 异常的字符串信息
+        return self.message
+
+
+class ResourceNotMeetConstraint(Exception):
+    def __init__(self, constraints):
+        super().__init__("Resource Not Meet Constraints")
+        self.description = ""
+        for constraint in constraints:
+            self.description += constraint.description + "\n"
 
 
 def register_resource(category, resource_type, comm_callback):
@@ -37,16 +59,12 @@ def register_resource(category, resource_type, comm_callback):
         _resource_port_mapping[resource_type] = comm_callback
 
 
-class ResourceError(Exception):
-    """
-    自定义异常处理
-    """
-
-    def __init__(self, msg):
-        self.message = msg
-
-    def __str__(self):  # 异常的字符串信息
-        return self.message
+def get_resource_pool(filename, owner):
+    ResourceSetting.load()
+    full_name = os.path.join(ResourceSetting.resource_path, filename)
+    rv = ResourcePool()
+    rv.load(full_name, owner)
+    return rv
 
 
 class ResourceDevice:
@@ -60,22 +78,34 @@ class ResourceDevice:
         self.name = name
         self.type = kwargs.get("type", None)
         self.description = kwargs.get("description", None)
-        self.ports = dict()
+        self.pre_connect = False
+        self.ports = {}
+        self._instance = None
 
-    def get_comm_instance(self):
+    def get_comm_instance(self, new=False):
         """
-        @return: 获取配置接口实例对象
+        获取资源句柄
+        @param new: 是否需要预先建立资源的管理实例
+        @return: 资源管理实例化句柄
         """
         # 判断类型是否进行过实例化注册
-        if self.type not in _resource_port_mapping:
-            raise ResourceError(f"类型[ {self.type} ]未注册!")
-        return _resource_device_mapping[self.type](self)
+        if self.type not in _resource_device_mapping:
+            raise ResourceError(f"资源类型 {self.type} 尚未注册")
+        # 是否需要预先建立资源的管理实例
+        if not new and self._instance:  # 不需要建立
+            return self._instance
+        else:  # 需要建立
+            self._instance = _resource_device_mapping[self.type](self)
+        return self._instance
 
     def add_port(self, name, *args, **kwargs):
         if name in self.ports:
             # 以 f开头表示在字符串内支持大括号内的python表达式
             raise Exception(f"端口名[ {name} ]已经存在")
         self.ports[f"{name}"] = DevicePort(self, name, args, kwargs)
+
+    def get_port_count(self, **kwargs):
+        return len(self.ports)
 
     def to_dict(self):
         ret = dict()
@@ -117,6 +147,7 @@ class ResourceSetting(SettingBase):
     resource_path = os.path.join(os.getcwd(), "test_resource")
     auto_connect = False
 
+
 class DevicePort:
     """ 代表设备的连接端口
     Attributes:
@@ -126,8 +157,19 @@ class DevicePort:
     def __init__(self, parent_device=None, name="", *args, **kwargs):
         self.parent = parent_device
         self.name = name
+        self.type = kwargs.get("type", None)
         self.description = kwargs.get("description", None)
         self.remote_ports = []
+        self._instance = None
+
+    def get_comm_instance(self, new=False):
+        if self.type not in _resource_port_mapping:
+            raise ResourceError(f"type {self.type} is not registered")
+        if not new and self._instance:
+            return self._instance
+        else:
+            self._instance = _resource_port_mapping[self.type](self)
+        return self._instanc
 
     def to_dict(self):
         """序列化方法
@@ -177,21 +219,18 @@ class DevicePort:
 
 class ResourcePool:
     """ 资源池类
-
     负责资源的序列化和反序列化
-
-    Attributes:
-        (待补全)
     """
 
     def __init__(self):
         """
         0ResourcePool的初始化函数
         """
-        self.topology = dict()
-        self.information = dict()
+        self.topology = {}  # 存放资源的字典
+        self.information = {}
         self.file_name = None
         self.reserved = None
+        self.owner = None
 
     def add_device(self, device_name, **kwargs):
         if device_name in self.topology:
@@ -253,25 +292,6 @@ class ResourcePool:
 
         self.owner = owner
 
-    def load(self, filename):
-        """
-        @param filename:文件名
-        @return:
-        """
-        # 检查文件是否存在
-        if not os.path.exists(filename):
-            raise ResourceError(f"查无文件[ {filename} ]")
-
-        # 初始化
-        self.topology.clear()
-        self.reserved = False
-        self.information = dict()
-
-        # 读取资源配置的JSON字符串
-        with open(filename) as file:
-            json_object = json.load(file)
-
-        # 对JSON字符串进行序列化操作
         if "info" in json_object:
             self.information = json_object['info']
         for key, value in json_object['devices'].items():
@@ -284,6 +304,38 @@ class ResourcePool:
                 for remote_port in port['remote_ports']:
                     remote_port_obj = self.topology[remote_port["device"]].ports[remote_port["port"]]
                     self.topology[key].ports[port_name].remote_ports.append(remote_port_obj)
+
+    # def load(self, filename):
+    #     """
+    #     @param filename:文件名
+    #     @return:
+    #     """
+    #     # 检查文件是否存在
+    #     if not os.path.exists(filename):
+    #         raise ResourceError(f"查无文件[ {filename} ]")
+    #
+    #     # 初始化
+    #     self.topology.clear()
+    #     self.reserved = False
+    #     self.information = dict()
+    #
+    #     # 读取资源配置的JSON字符串
+    #     with open(filename) as file:
+    #         json_object = json.load(file)
+    #
+    #     # 对JSON字符串进行序列化操作
+    #     if "info" in json_object:
+    #         self.information = json_object['info']
+    #     for key, value in json_object['devices'].items():
+    #         device = ResourceDevice.from_dict(value)
+    #         self.topology[key] = device
+    #
+    #     # 映射所有设备的连接关系
+    #     for key, device in json_object['devices'].items():
+    #         for port_name, port in device['ports'].items():
+    #             for remote_port in port['remote_ports']:
+    #                 remote_port_obj = self.topology[remote_port["device"]].ports[remote_port["port"]]
+    #                 self.topology[key].ports[port_name].remote_ports.append(remote_port_obj)
 
     def save(self, filename):
         with open(filename, mode="w") as file:
@@ -334,6 +386,55 @@ class ResourcePool:
                     ret.append(value)
         return ret
 
+    def collect_connection_route(self, resource, constraints=list()):
+        """
+        获取资源连接路由
+        """
+        # 限制类必须是连接限制ConnectionConstraint
+        for constraint in constraints:
+            if not isinstance(constraint, ConnectionConstraint):
+                raise ResourceError(
+                    "collect_connection_route only accept ConnectionConstraints type")
+        ret = []
+        for constraint in constraints:
+            conns = constraint.get_connection(resource)
+            if not any(conns):
+                raise ResourceNotMeetConstraint([constraint])
+            for conn in conns:
+                ret.append(conn)
+        return ret
+
+
+class Constraint(metaclass=ABCMeta):
+    """
+    资源选择器限制条件的基类
+    """
+
+    def __init__(self):
+        self.description = None
+
+    @abstractmethod
+    def is_meet(self, resource, *args, **kwargs):
+        pass
+
+
+class ConnectionConstraint(Constraint, metaclass=ABCMeta):
+    """
+    用户限制获取Remote Port的限制条件。
+    """
+
+    @abstractmethod
+    def get_connection(self, resource, *args, **kwargs):
+        pass
+
+
+@static_setting.setting("ResourceSetting")
+class ResourceSetting(SettingBase):
+    file_name = "resource_setting.setting"
+
+    resource_path = os.path.join(os.environ['HOME'], "test_resource")
+    auto_connect = False
+
 
 if __name__ == '__main__':
     # 创建实例化对象
@@ -345,8 +446,15 @@ if __name__ == '__main__':
     switch2.add_port("ETH1/1")
     switch2.add_port("ETH1/2")
 
-    # 添加对象之间的交互关系
     switch.ports['ETH1/1'].remote_ports.append(switch2.ports['ETH1/1'])
     switch2.ports['ETH1/1'].remote_ports.append(switch.ports['ETH1/1'])
 
-    print(json.dumps(switch.to_dict(), indent=4))
+    rp = ResourcePool()
+    rp.topology['switch1'] = switch
+    rp.topology['switch2'] = switch2
+    # rp.save("test.json")
+    rp.load("test.json", "michael")
+    rp.reserve()
+    rp2 = ResourcePool()
+    rp2.load("test.json", "jason")
+    print("done")

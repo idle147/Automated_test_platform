@@ -8,17 +8,10 @@ import time
 
 
 class TimeTool:
-    @classmethod
-    def get_time_stamp(cls):
-        ct = time.time()
-        local_time = time.localtime(ct)
-        # 时间格式化
-        data_head = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
-        time_stamp = data_head
-        # data_secs = (ct - int(ct)) * 1000
-        # time_stamp = "%s.%03d" % (data_head, data_secs)
-        # 去除下划线和空格
-        # stamp = ("".join(time_stamp.split()[0].split("-")) +
-        #         "".join(time_stamp.split()[1].split(":"))).replace('.', '')
-        # print(stamp)
-        return time_stamp
+    @staticmethod
+    def get_local_time():
+        return time.strftime("%B %d, %y %H:%M:%S", time.localtime())
+
+    @staticmethod
+    def get_time_stamp():
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())

@@ -7,6 +7,8 @@
 import collections
 import os
 from enum import Enum, IntEnum
+from functools import wraps
+from threading import Event, Lock
 
 from core.tool.time_tool import TimeTool
 
@@ -16,6 +18,21 @@ from core.tool.time_tool import TimeTool
 #   1. 通过测试报告单例（ResultReporter）来控制整个测试用例执行周期的报告输出
 #   2. 将测试结果映射成树形数据结构
 # =====================================
+
+def locker(lock):
+    def outer(func):
+        @wraps(func)
+        def inner(*args, **kwargs):
+            try:
+                lock.acquire()
+                return func(*args, **kwargs)
+            finally:
+                lock.release()
+
+        return inner
+
+    return outer
+
 
 class NodeType(IntEnum):
     """
@@ -34,6 +51,7 @@ class StepResult(IntEnum):
     INFO = 1  # 表示节点的默认状态
     PASS = 2  # 表示节点通过
     FAIL = 3  # 表示测试点验证失败
+    STOP = 4  # 表示测试点停止执行
     EXCEPTION = 8  # 表示执行的时候发生了未经处理的异常
     WARNING = 16
     ERROR = 32  # 表示抓住了代码的异常并进行了处理
@@ -47,12 +65,29 @@ class StepInfo(Enum):
 
 
 class ResultReporter:
-    def __init__(self):
+    my_lock = Lock()
+
+    def __init__(self, logger):
         self.root = ResultNode("Root")
         self.recent_node = self.root  # 最近节点
         self.recent_case = None  # 当前测试用例
         self.recent_list = None  # 测试节点列表
 
+        self.halt_on_failure = False  # 失败停止标识符
+        self.halt_on_exception = False  # 异常停止标识符
+        self.halt_on_stop = False  # 中止停止标识符
+        self.halt_event = Event()  # 事件信号量
+
+        self.logger = logger
+        self.case_logger = None
+
+    def search_result(self, case_name):
+        """
+        搜索给定的测试用例名称的测试结果
+        """
+        self._search_result(self.root, case_name)
+
+    @locker(my_lock)
     def add_node(self, header, message="", status=StepResult.INFO, node_type=NodeType.Other):
         """
         添加最近节点的子节点
@@ -62,12 +97,23 @@ class ResultReporter:
                                                       status=status,
                                                       node_type=node_type)
 
+    @locker(my_lock)
     def add(self, status: StepResult, headline, message=""):
-        self.recent_node.add_child(header=headline,
-                                   message=message,
-                                   status=status,
-                                   node_type=NodeType.Step)
+        self.recent_node.add_child(header=headline, message=message,
+                                   status=status, node_type=NodeType.Step)
+        self._log_info("Step: " + headline)
+        self._log_info("Message" + message)
+        # 每次添加测试步骤节点时, halt_event复位
+        self.halt_event.clear()
+        # 判断节点的状态类型, 若失败, 则阻塞线程
+        if status == StepResult.FAIL and self.halt_on_failure:
+            self.halt_event.wait()
+        elif status == StepResult.EXCEPTION and self.halt_on_exception:
+            self.halt_event.wait()
+        elif status == StepResult.STOP and self.halt_on_stop:
+            self.halt_event.wait()
 
+    @locker(my_lock)
     def pop(self):
         """
         弹出最近的节点
@@ -77,16 +123,29 @@ class ResultReporter:
         if self.recent_node.parent:
             self.recent_node = self.recent_node.parent
 
+    @locker(my_lock)
     def add_step_group(self, group_name):
         self.add_node(header=group_name, node_type=NodeType.Step)
+        self._log_info(f"[Test Step Group] {group_name}")
 
+    @locker(my_lock)
+    def add_event_group(self, group_name):
+        rv = self.recent_node.add_child(header=group_name, node_type=NodeType.Step)
+        rv.log = self.case_logger if self.case_logger is not None else self.logger
+        self._log_info(f"[Event] {group_name}")
+        return rv
+
+    @locker(my_lock)
     def end_step_group(self):
         self.pop()
 
+    @locker(my_lock)
     def add_test(self, case_name):
-        self.add_node(header=case_name, node_type=NodeType.Case)
+        self.recent_node = self.recent_node.add_child(header=case_name, node_type=NodeType.Case)
         self.recent_case = self.recent_node
+        self._log_info(f"[Test Case] {case_name}")
 
+    @locker(my_lock)
     def end_test(self):
         """
         回退到当前测试用例的父节点
@@ -96,10 +155,13 @@ class ResultReporter:
         self.recent_node = self.recent_case.parent
         self.recent_case = None
 
+    @locker(my_lock)
     def add_list(self, list_name):
         self.recent_node = self.recent_node.add_child(header=list_name, node_type=NodeType.TestList)
         self.recent_case = self.recent_node
+        self._log_info(f"[Test list] {list_name}")
 
+    @locker(my_lock)
     def end_list(self):
         """
         回退到当前测试列表的父节点
@@ -108,6 +170,31 @@ class ResultReporter:
             return
         self.recent_node = self.recent_list.parent
         self.recent_list = None
+
+    def add_precheck_result(self, result, headline):
+        pass
+
+    def is_high_priority_passed(self, priority):
+        pass
+
+    def _search_result(self, node, case_name):
+        if node.type == NodeType.Step:
+            return None
+        for child in node.children:
+            if child.header == case_name:
+                return child.status
+            else:
+                rv = self._search_result(child, case_name)
+                if rv:
+                    return rv
+        else:
+            return None
+
+    def _log_info(self, message):
+        if self.case_logger:
+            self.case_logger.info(message)
+        else:
+            self.logger.info(message)
 
 
 class ResultNode:
@@ -130,6 +217,7 @@ class ResultNode:
         self.parent = parent  # 节点的父节点
         self.type = node_type  # 节点类型
         self.timestamp = TimeTool.get_time_stamp()  # 节点创建的时间戳
+        self.log = None
 
     def add_child(self, header, status=StepResult.INFO, message="", node_type=NodeType.Other):
         """
@@ -145,14 +233,24 @@ class ResultNode:
         new_node.set_status(status)  # 初始化当前节点状态
         return new_node
 
+    def add(self, status, header, message=""):
+        """
+        简化的add方法，提供给事件驱动
+        """
+        self.add_child(header, status, message, NodeType.Step)
+        if self.log:
+            self.log.info(header)
+
     def set_status(self, status):
         """
         设置当前节点的状态, 同时更新父节点的状态
         # TODO: 当一个步骤失败后, 其父节点应显示为失败
                 原算法是子节点更新状态便更新父节点状态，该处算法可以进行下一步的优化。
         """
-        # 对于step类型或者非case类型的节点, 不做状态设置
+        # 不做状态设置的节点判断
         if self.type == NodeType.Other:
+            return
+        if status == StepResult.INFO:
             return
         # 更改当前节点的状态
         if self.status in [StepResult.INFO, StepResult.PASS]:
@@ -292,47 +390,80 @@ class ResultNode:
 
 
 if __name__ == '__main__':
-    rr = ResultReporter()
+    import logging
+
+    rr = ResultReporter(logging)
     # 添加一个测试列表节点
     rr.add_list("Test List 1")
 
     # 添加一个测试用例节点
-    rr.add_test("测试用例 1")
+    rr.add_test("Test Case 1")
+
     # 添加一个SETUP步骤节点
     rr.add_step_group("SETUP")
     # 添加一些步骤
-    rr.add(StepResult.PASS, "请做一些事情", "我正在做......")
+    rr.add(StepResult.PASS, "Do Something Setup", "I'm doing something")
     rr.end_step_group()
+
     # 添加一个测试步骤节点
-    rr.add_step_group("测试")
-    rr.add_step_group("登陆网页")
-    rr.add(StepResult.PASS, "输入用户名", "用户名是admin")
-    rr.add(StepResult.PASS, "输入密码", "密码是admin")
-    rr.add(StepResult.FAIL, "登陆", "登陆失败")
+    rr.add_step_group("TEST")
+
+    rr.add_step_group("Login to website")
+    rr.add(StepResult.PASS, "Input Username", "Username is admin")
+    rr.add(StepResult.PASS, "Input Password", "Password is admin")
+    rr.add(StepResult.FAIL, "Login", "Login is failed")
     rr.end_step_group()
+
+    # 这里我们少了一个end_group, 但是end_test会把我们带回正确的位置。
     rr.end_test()
 
-    # 添加第二个测试用例
-    rr.add_test("测试用例 2")
+    # 第二个测试用例
+    rr.add_test("Test Case 2")
     rr.add_step_group("SETUP")
-    rr.add(StepResult.PASS, "请做一些事情", "我正在做......")
+    rr.add(StepResult.PASS, "Do Something Setup", "I'm doing something")
     rr.end_step_group()
 
-    rr.add_step_group("测试")
-    rr.add_step_group("登陆网页")
-    rr.add(StepResult.PASS, "输入用户名", "用户名是admin")
-    rr.add(StepResult.PASS, "输入密码", "密码是admin")
-    rr.add(StepResult.FAIL, "登陆", "登陆失败")
+    rr.add_step_group("TEST")
+    rr.add_step_group("Login to website")
+    rr.add(StepResult.PASS, "Input Username", "Username is admin")
+    rr.add(StepResult.PASS, "Input Password", "Password is admin")
+    rr.end_step_group()
+    rr.end_test()
+    rr.add_list("Sub Test List")
+    rr.add_test("Test Case 3")
+    rr.add_step_group("SETUP")
+    rr.add(StepResult.PASS, "Do Something Setup", "I'm doing something")
+    rr.end_step_group()
+
+    rr.add_step_group("TEST")
+    rr.add_step_group("Login to website")
+    rr.add(StepResult.PASS, "Input Username", "Username is admin")
+    rr.add(StepResult.PASS, "Input Password", "Password is admin")
+    rr.end_step_group()
+    rr.end_test()
+    rr.end_list()
+
+    rr.add_test("Test Case 4")
+    rr.add_step_group("SETUP")
+    rr.add(StepResult.PASS, "Do Something Setup", "I'm doing something")
+    rr.end_step_group()
+
+    rr.add_step_group("TEST")
+    rr.add_step_group("Login to website")
+    rr.add(StepResult.PASS, "Input Username", "Username is admin")
+    rr.add(StepResult.PASS, "Input Password", "Password is admin")
     rr.end_step_group()
     rr.end_test()
 
-    # 结束测试列表
     rr.end_list()
-    print(rr.root.to_text())
 
-    # 统计测试结果
+    print(rr.root.to_text())
     tp_stats = rr.root.get_test_point_stats()
-    print(tp_stats)
-    print("====================================================================")
+    print(f"PASS: {tp_stats[0]}, FAIL: {tp_stats[1]}")
+    print(f"ERROR: {tp_stats[2]}, WARNING: {tp_stats[3]}, EXCEPTION: {tp_stats[4]}")
     tc_stats = rr.root.get_test_case_stats()
-    print(tc_stats)
+    print(f"PASS: {tc_stats[0]}, FAIL: {tc_stats[1]}")
+    print(f"ERROR: {tc_stats[2]}, WARNING: {tc_stats[3]}, EXCEPTION: {tc_stats[4]}")
+
+    # import json
+    # print(json.dumps(rr.root.to_dict(), indent=4))

@@ -14,6 +14,13 @@
     <option name="format" value="EPYTEXT" />
     <option name="myDocStringFormat" value="Epytext" />
   </component>
+  <component name="PyNamespacePackagesService">
+    <option name="namespacePackageFolders">
+      <list>
+        <option value="$MODULE_DIR$/core/tool" />
+      </list>
+    </option>
+  </component>
   <component name="TestRunnerService">
     <option name="PROJECT_TEST_RUNNER" value="pytest" />
   </component>

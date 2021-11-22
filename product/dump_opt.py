@@ -5,7 +5,7 @@
 @Author: Yu Yangxin
 @Description: 管理资源设备类
 """
-from abc import ABCMeta, abstractmethod, ABC
+from abc import ABCMeta, abstractmethod
 
 
 class DumpInterface():
@@ -90,6 +90,7 @@ class ResourceDevice(DumpInterface):
         @param dict_obj: 需要反序列化的字典对象
         @return: ResourceDevice的实例
         """
-        ret = ResourceDevice()
-        for key, value in dict_obj.items():
-            if key == "ports":
+        # ret = ResourceDevice()
+        # for key, value in dict_obj.items():
+        # if key == "ports":
+        pass

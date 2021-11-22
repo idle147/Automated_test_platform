@@ -14,7 +14,7 @@ import os
 from abc import ABCMeta
 from functools import wraps
 
-_DEFAULT_PATH = os.path.join(os.getcwd(), "test_config")  # environ['HOME']就代表了当前这个用户的主目录
+_DEFAULT_PATH = os.path.join(os.getcwd(), "test_config")
 
 
 class SettingError(Exception):
@@ -72,6 +72,17 @@ class SettingBase(metaclass=ABCMeta):
                 setattr(cls, key, value)
         else:
             cls.save()  # 文件不存在则通过save方法生成默认配置文件
+
+
+# =====================================
+# 提供了测试用例的动态配置
+# 1. 将配置的文件名和路径隐藏起来, 交给测试引擎来控制
+# 2. 通过实例化的方法动态地修改文件名及路径, 以便在相同地测试用例使用不同地配置实例地时候, 将存放地配置文件用不同地文件名命名
+# =====================================
+class TestSettingBase(SettingBase):
+    def __init__(self, setting_path, file_name):
+        self.__class__.setting_path = setting_path
+        self.__class__.file_name = file_name
 
 
 # =====================================
@@ -198,7 +209,6 @@ def dynamic_setting(cls):
                     value.file_name = f"{cls.__name__}_{value.file_name}.setting"
                 value.load()
         return rv
-
     return inner
 
 
@@ -206,7 +216,7 @@ def dynamic_setting(cls):
 # 带逻辑功能的配置:
 #   作用场景: 测试用例执行前后或者执行时所需要的配置, 或者执行的过程
 #   通过统一的输入参数实现自己的业务逻辑, 然后通过统一的管理工具来管理其装载,提供给测试引擎统一调用
-#   代码路径: core/config/module.py
+#   代码路径: core/config/logic_module.py
 # =====================================
 
 

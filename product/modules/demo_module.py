@@ -4,7 +4,7 @@
 # @Author: yangxin
 # @Email: 2827709585@qq.com
 # @File: demo_module.py
-from core.config.module import ModuleBase, ModuleType
+from core.config.logic_module import ModuleBase, ModuleType
 from core.config.setting import dynamic_setting, SettingBase
 from core.resource.pool import ResourcePool
 from core.result.reporter import ResultReporter, StepInfo
@@ -22,7 +22,7 @@ class DemoModule(ModuleBase):
         # 每个模块有自己的日志文件与报告
         super().__init__(report, resource)
         # 每个模块有自己的设置文件与路径
-        self.setting_path = kwargs.get("setting_path", ".")
+        self.setting_path = kwargs.get("setting_path", "")
         self.setting_file = kwargs.get("setting_file", None)
 
     def action(self):

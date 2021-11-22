@@ -3,7 +3,7 @@
 # @Type: py file
 # @Author: yangxin
 # @Email: 2827709585@qq.com
-# @File: module.py
+# @File: logic_module.py
 import json
 import os
 from abc import ABCMeta, abstractmethod
@@ -149,9 +149,11 @@ class ModuleManager:
         @return:
         """
         rv = []
-        for mkey, mvalue in self.modules.items():
-            if mvalue['class'].module_type.value == module_type.value:
-                rv.append(mvalue['class'](result_reporter, resources))
+        for m_key, m_value in self.modules.items():
+            print(m_value['class'].module_type)
+            print(module_type)
+            if m_value['class'].module_type.value == module_type.value:
+                rv.append(m_value['class'](result_reporter, resources))
         return rv
 
     def save(self):
@@ -161,12 +163,12 @@ class ModuleManager:
         """
         obj = {}
         obj['modules'] = []
-        for mkey, mvalue in self.modules.items():
+        for m_key, m_value in self.modules.items():
             obj['modules'].append({
-                "name": mkey,
-                "package": mvalue["class"].__module__,
-                "setting_file": mvalue["setting_file"],
-                "setting_path": mvalue["setting_path"]
+                "name": m_key,
+                "package": m_value["class"].__module__,
+                "setting_file": m_value["setting_file"],
+                "setting_path": m_value["setting_path"]
             })
 
         file_dir = os.path.dirname(ModuleSetting.module_list_file)
@@ -174,3 +176,21 @@ class ModuleManager:
             os.makedirs(file_dir)
         with open(ModuleSetting.module_list_file, "w") as file:
             json.dump(obj, file, indent=4)
+
+    def run_module(self, module_type):
+        pass
+
+    def stop_module(self):
+        pass
+
+
+if __name__ == "__main__":
+    from product.modules.demo_module import DemoModule
+
+    mm = ModuleManager()
+    mm.load()
+    mm.add_module(DemoModule)
+    mm.save()
+    mm.load()
+    post_module = mm.get_module_instances(ModuleType.POST, None, None)
+    print(post_module)

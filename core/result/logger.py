@@ -120,7 +120,7 @@ class LoggerManager:
             logger_dict.pop(logger_name)
             # 如果该日志注册了测试用例的handler，则移除
             if self.logger_info[logger_name]['is_test']:
-                for llogger, lvalue in self.logger_info.items():
+                for _, lvalue in self.logger_info.items():
                     if 'case_handler' in lvalue:
                         lvalue['logger'].removeHandler(lvalue['case_handler'])
                         lvalue.pop("case_handler")  # 删除对应的测试用例句柄的字典信息
