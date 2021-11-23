@@ -3,7 +3,7 @@
 # @Type: py file
 # @Author: yangxin
 # @Email: 2827709585@qq.com
-# @File: caseruner.py
+# @File: caserunner.py
 
 """
 Test Engine
@@ -201,7 +201,7 @@ class CaseRunner:
 
     # =====================================
     # 测试用例流程控制
-    #   开始 -> 前置条件判断 -> 逻辑模块装载 -> 获取资源 -> setup -> test -> cleanup -> 测试用例执行结束
+    #   开始 -> 前置条件判断 -> 逻辑模块装载 -> 获取资源 -> setup -> code_test -> cleanup -> 测试用例执行结束
     # =====================================
     def run_case_lcm(self, test: TestCaseBase):
         """

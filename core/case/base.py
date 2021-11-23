@@ -20,9 +20,9 @@ class TestType(IntEnum):
 class TestCaseBase(metaclass=ABCMeta):
     """
     测试用例基类
-    RFT(rational function test): 三步走
+    RFT(rational function code_test): 三步走
         setup: 用来进行测试过程的配置
-        test: 具体的测试过程
+        code_test: 具体的测试过程
         cleanup: 恢复测试的配置,测试对象恢复初始状态
     """
 

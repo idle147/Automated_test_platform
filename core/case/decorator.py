@@ -67,8 +67,8 @@ def _replace_value(obj, test_case):
 
 def data_provider(filename=None, stop_on_error=False):
     """
-    The data provider for test method in test case
-    :param filename: the test data file, default case name is script name + ".json"
+    The data provider for code_test method in code_test case
+    :param filename: the code_test data file, default case name is script name + ".json"
     :param stop_on_error: If true, the case will stop if 1 data iteration failed.
     :return:
     """
@@ -82,7 +82,7 @@ def data_provider(filename=None, stop_on_error=False):
                 case_file = filename
             test_data_file = case_file + ".json"
             if not os.path.exists(test_data_file):
-                raise TestDataFileNotFound(f"Cannot found test data for case {test_case.__class__.__name__}")
+                raise TestDataFileNotFound(f"Cannot found code_test data for case {test_case.__class__.__name__}")
             with open(test_data_file) as file:
                 test_data = json.load(file)
             iteration = 1

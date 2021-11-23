@@ -452,9 +452,9 @@ if __name__ == '__main__':
     rp = ResourcePool()
     rp.topology['switch1'] = switch
     rp.topology['switch2'] = switch2
-    # rp.save("test.json")
-    rp.load("test.json", "michael")
+    # rp.save("code_test.json")
+    rp.load("code_test.json", "michael")
     rp.reserve()
     rp2 = ResourcePool()
-    rp2.load("test.json", "jason")
+    rp2.load("code_test.json", "jason")
     print("done")
