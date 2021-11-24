@@ -209,6 +209,7 @@ def dynamic_setting(cls):
                     value.file_name = f"{cls.__name__}_{value.file_name}.setting"
                 value.load()
         return rv
+
     return inner
 
 

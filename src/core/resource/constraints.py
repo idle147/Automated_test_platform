@@ -29,6 +29,16 @@ class Constraint(metaclass=ABCMeta):
         pass
 
 
+class ConnectionConstraint(Constraint, metaclass=ABCMeta):
+    """
+    用户限制获取Remote Port的限制条件。
+    """
+
+    @abstractmethod
+    def get_connection(self, resource, *args, **kwargs):
+        pass
+
+
 class AndroidConstraint(Constraint):
     """
     判断手机的操作系统是否是安卓机, 可以附带版本大小判断

@@ -6,57 +6,26 @@
 """
     测试资源池
     ~~~~~~~~~~~
-    一组测试资源的合集,测试平台可以对测试资源池进行统一的管理,我们可以给测试资源池设计一些功能,提供给测试用例开发者调用
+    一组测试资源的合集,测试平台可以对测试资源池进行统一的管理
+    我们可以给测试资源池设计一些功能,提供给测试用例开发者调用
 """
+
 import json
 import os
 import time
-from abc import ABCMeta, abstractmethod
 
-from core.config.setting import static_setting, SettingBase
+from core.resource.constraints import ConnectionConstraint
+from core.resource.error import ResourceError, ResourceNotMeetConstraint
+from core.resource.setting import ResourceSetting
 
 # =====================================
 # 配置接口:管理测试资源的接口, 是代码用来向测试资源发送和接收信息的重要途径
-# 方法: 1. 对响应的库进行实例化, 需要调用的时候再进行封装(使用回调函数)
+# 方法: 1. 对相应的库进行实例化, 需要调用的时候再进行封装(使用回调函数)
 #      2. 实例化的方法不传递任何参数,把需要调用的方法提前注册,生成资源类型和实例化方法之间的映射关系
 # =====================================
 # 保存资源类型和实例化方法的映射关系
 _resource_device_mapping = {}
 _resource_port_mapping = {}
-
-
-class ResourceError(Exception):
-    """
-    自定义异常处理
-    """
-
-    def __init__(self, msg):
-        self.message = msg
-
-    def __str__(self):  # 异常的字符串信息
-        return self.message
-
-
-class ResourceNotMeetConstraint(Exception):
-    def __init__(self, constraints):
-        super().__init__("Resource Not Meet Constraints")
-        self.description = ""
-        for constraint in constraints:
-            self.description += constraint.description + "\n"
-
-
-def register_resource(category, resource_type, comm_callback):
-    """
-    注册配置接口实例化的方法或类
-    @param category:
-    @param resource_type:
-    @param comm_callback:
-    @return:
-    """
-    if category == "device":
-        _resource_port_mapping[resource_type] = comm_callback
-    elif category == "port":
-        _resource_port_mapping[resource_type] = comm_callback
 
 
 def get_resource_pool(filename, owner):
@@ -65,6 +34,20 @@ def get_resource_pool(filename, owner):
     rv = ResourcePool()
     rv.load(full_name, owner)
     return rv
+
+
+def register_resource(category, resource_type, comm_callback):
+    """
+    注册配置接口实例化的方法或类
+    @param category: 资源的类型
+    @param resource_type: 具体的资源信息
+    @param comm_callback: 具体的实例化方法
+    @return:
+    """
+    if category == "device":
+        _resource_port_mapping[resource_type] = comm_callback
+    elif category == "port":
+        _resource_port_mapping[resource_type] = comm_callback
 
 
 class ResourceDevice:
@@ -108,10 +91,10 @@ class ResourceDevice:
         return len(self.ports)
 
     def to_dict(self):
-        ret = dict()
+        ret = {}
         for key, value in self.__dict__.items():
             if key == "ports":
-                ret[key] = dict()
+                ret[key] = {}
                 for port_name, port in value.items():
                     ret[key][port_name] = port.to_dict()  # 调用DevicePort采用迭代的思想获取端口的实例化结果
             else:
@@ -138,16 +121,6 @@ class ResourceDevice:
         return ret
 
 
-@static_setting.setting("ResourceSetting")
-class ResourceSetting(SettingBase):
-    """资源配置模块的配置类
-    当资源模块被引用时,会执行装饰器函数,将该类自动添加到static_setting的setting属性中
-    """
-    file_name = "resource_setting.setting"
-    resource_path = os.path.join(os.getcwd(), "test_resource")
-    auto_connect = False
-
-
 class DevicePort:
     """ 代表设备的连接端口
     Attributes:
@@ -163,8 +136,13 @@ class DevicePort:
         self._instance = None
 
     def get_comm_instance(self, new=False):
+        """
+        获取测试资源的实例化句柄
+        @param new:
+        @return:
+        """
         if self.type not in _resource_port_mapping:
-            raise ResourceError(f"type {self.type} is not registered")
+            raise ResourceError(f"类型 {self.type} 尚未注册")
         if not new and self._instance:
             return self._instance
         else:
@@ -173,14 +151,12 @@ class DevicePort:
 
     def to_dict(self):
         """序列化方法
-
         传统的序列化方法__dict__: 1.无法实例化类实例所对应的内存地址; 2.在做反序列化的时候无法确定实例的类型; 3. 无法递归处理
-        解决方法: 循环遍历所有的属性,如果需要parent和remote_port字段,则特殊处理。只存储parent的名称,以及远端端口实例化的parent和端口名称,以避免递归
-
+        解决方法: 循环遍历所有的属性,如果需要parent和remote_port字段,则特殊处理。[只存储parent的名称,以及远端端口实例化的parent和端口名称,以避免递归]
         @return:
             序列化对象
         """
-        ret = dict()
+        ret = {}
         for key, value in self.__dict__.items():
             if key == "parent":
                 ret[key] = value.name
@@ -226,7 +202,7 @@ class ResourcePool:
         """
         0ResourcePool的初始化函数
         """
-        self.topology = {}  # 存放资源的字典
+        self.topology = {}  # 存放所有资源的字典
         self.information = {}
         self.file_name = None
         self.reserved = None
@@ -305,38 +281,6 @@ class ResourcePool:
                     remote_port_obj = self.topology[remote_port["device"]].ports[remote_port["port"]]
                     self.topology[key].ports[port_name].remote_ports.append(remote_port_obj)
 
-    # def load(self, filename):
-    #     """
-    #     @param filename:文件名
-    #     @return:
-    #     """
-    #     # 检查文件是否存在
-    #     if not os.path.exists(filename):
-    #         raise ResourceError(f"查无文件[ {filename} ]")
-    #
-    #     # 初始化
-    #     self.topology.clear()
-    #     self.reserved = False
-    #     self.information = dict()
-    #
-    #     # 读取资源配置的JSON字符串
-    #     with open(filename) as file:
-    #         json_object = json.load(file)
-    #
-    #     # 对JSON字符串进行序列化操作
-    #     if "info" in json_object:
-    #         self.information = json_object['info']
-    #     for key, value in json_object['devices'].items():
-    #         device = ResourceDevice.from_dict(value)
-    #         self.topology[key] = device
-    #
-    #     # 映射所有设备的连接关系
-    #     for key, device in json_object['devices'].items():
-    #         for port_name, port in device['ports'].items():
-    #             for remote_port in port['remote_ports']:
-    #                 remote_port_obj = self.topology[remote_port["device"]].ports[remote_port["port"]]
-    #                 self.topology[key].ports[port_name].remote_ports.append(remote_port_obj)
-
     def save(self, filename):
         with open(filename, mode="w") as file:
             root_object = dict()
@@ -386,16 +330,20 @@ class ResourcePool:
                     ret.append(value)
         return ret
 
-    def collect_connection_route(self, resource, constraints=list()):
-        """
-        获取资源连接路由
+    def collect_connection_route(self, resource, constraints=[]):
+        """ 根据资源选择符合资源的资源限制器
+        获取资源连接路由: 在做资源条件判断时(确定资源限制),就将这些符合条件的设备返回给[测试用例开发者]
+        @parm resource: 资源
+        @param constraints: 连接限制
+
         """
         # 限制类必须是连接限制ConnectionConstraint
         for constraint in constraints:
             if not isinstance(constraint, ConnectionConstraint):
-                raise ResourceError(
-                    "collect_connection_route only accept ConnectionConstraints type")
+                raise ResourceError("collect_connection_route 仅接受 ConnectionConstraints 类型")
+
         ret = []
+        # 对所有限定进行判断
         for constraint in constraints:
             conns = constraint.get_connection(resource)
             if not any(conns):
@@ -403,37 +351,6 @@ class ResourcePool:
             for conn in conns:
                 ret.append(conn)
         return ret
-
-
-class Constraint(metaclass=ABCMeta):
-    """
-    资源选择器限制条件的基类
-    """
-
-    def __init__(self):
-        self.description = None
-
-    @abstractmethod
-    def is_meet(self, resource, *args, **kwargs):
-        pass
-
-
-class ConnectionConstraint(Constraint, metaclass=ABCMeta):
-    """
-    用户限制获取Remote Port的限制条件。
-    """
-
-    @abstractmethod
-    def get_connection(self, resource, *args, **kwargs):
-        pass
-
-
-@static_setting.setting("ResourceSetting")
-class ResourceSetting(SettingBase):
-    file_name = "resource_setting.setting"
-
-    resource_path = os.path.join(os.environ['HOME'], "test_resource")
-    auto_connect = False
 
 
 if __name__ == '__main__':
@@ -452,7 +369,6 @@ if __name__ == '__main__':
     rp = ResourcePool()
     rp.topology['switch1'] = switch
     rp.topology['switch2'] = switch2
-    # rp.save("code_test.json")
     rp.load("code_test.json", "michael")
     rp.reserve()
     rp2 = ResourcePool()
