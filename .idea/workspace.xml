@@ -1,10 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="80fd2a0f-30c2-45a3-8679-94c799575fd6" name="变更" comment="">
+    <list default="true" id="80fd2a0f-30c2-45a3-8679-94c799575fd6" name="变更" comment="readme更新">
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/doc/三层架构.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/doc/伪类图-层次化结构图.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/doc/伪类图.drawio" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/doc/平台前后端分离.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/doc/测试系统基本调用.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/controller/manager.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/case/base.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/case/decorator.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/case/manager.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/case/precondition.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/config/logic_module.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/config/module_list.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/config/setting.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/resource/constraints.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/resource/error.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/resource/pool.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/resource/setting.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/result/logger.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/result/output_reporter.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/result/reporter.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/testengine/caserunner.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/testengine/testlist.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/tool/file_tool.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/tool/global_var.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/tool/time_tool.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/core/unittest/report_test.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/dump_opt.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/log/log_test/test1.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/log/test_case/Module.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/log/test_case/democase.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/modules/demo_module.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/resource/instancecreation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/resource/server.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/testcase/demo/helloworld.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/product/testlist/demo_list.testlist" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/third_part/commandline/base.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/third_part/commandline/ssh.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/third_part/commandline/telnet.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/user_interface/rest/endpoint/runner.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/user_interface/rest/index.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/user_interface/start.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
@@ -80,8 +119,16 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1637821777591</updated>
-      <workItem from="1637821781577" duration="5141000" />
+      <workItem from="1637821781577" duration="5449000" />
     </task>
+    <task id="LOCAL-00001" summary="readme更新">
+      <created>1637829878406</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1637829878406</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -97,5 +144,13 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CHECK_NEW_TODO" value="false" />
+    <MESSAGE value="Review：可扩展的测试资源管理模块" />
+    <MESSAGE value="readme更新" />
+    <option name="LAST_COMMIT_MESSAGE" value="readme更新" />
+    <option name="OPTIMIZE_IMPORTS_BEFORE_PROJECT_COMMIT" value="true" />
+    <option name="REFORMAT_BEFORE_PROJECT_COMMIT" value="true" />
   </component>
 </project>
