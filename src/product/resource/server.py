@@ -46,7 +46,7 @@ class SSHServer(Server):
     def get_resource(self, config_filename, device_type):
         resource = ResourcePool()
         resource.load(config_filename)
-        ssh_device = resource.collect_device(device_type="ssh_server")[0]
+        ssh_device = resource.collect_device_info(device_type="ssh_server")[0]
         ssh_comm = (ssh_device["ip"], ssh_device["port"],
                     ssh_device["username"], ssh_device["password"])
         return ssh_comm

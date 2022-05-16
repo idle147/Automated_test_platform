@@ -14,6 +14,11 @@ from core.tool.time_tool import TimeTool
 
 
 # =====================================
+# 内容
+#   1. 测试步骤和日志分离
+#   2. 测试步骤的控制
+#   3. 日志的分类
+
 # 基于树形的测试步骤
 #   1. 通过测试报告单例（ResultReporter）来控制整个测试用例执行周期的报告输出
 #   2. 将测试结果映射成树形数据结构
@@ -70,9 +75,10 @@ class ResultReporter:
     def __init__(self, logger):
         self.root = ResultNode("Root")
         self.recent_node = self.root  # 最近节点
-        self.recent_case = None  # 当前测试用例
-        self.recent_list = None  # 测试节点列表
 
+        # 失败回滚
+        self.recent_case = None  # 当前测试用例标识符,为None表示添加失败
+        self.recent_list = None  # 测试节点列表
         self.halt_on_failure = False  # 失败停止标识符
         self.halt_on_exception = False  # 异常停止标识符
         self.halt_on_stop = False  # 中止停止标识符
@@ -96,6 +102,22 @@ class ResultReporter:
                                                       message=message,
                                                       status=status,
                                                       node_type=node_type)
+
+    # 若添加的节点没有子节点(如:叶子节点),则需要执行一次pop方法
+    @locker(my_lock)
+    def add_step_group(self, group_name):
+        """
+            初始化一个步骤的集合
+        """
+        self.add_node(header=group_name, node_type=NodeType.Step)
+        self._log_info(f"[Test Step Group] {group_name}")
+
+    @locker(my_lock)
+    def end_step_group(self):
+        """
+            退出一个步骤的集合
+        """
+        self.pop()
 
     @locker(my_lock)
     def add(self, status: StepResult, headline, message=""):
@@ -124,11 +146,6 @@ class ResultReporter:
             self.recent_node = self.recent_node.parent
 
     @locker(my_lock)
-    def add_step_group(self, group_name):
-        self.add_node(header=group_name, node_type=NodeType.Step)
-        self._log_info(f"[Test Step Group] {group_name}")
-
-    @locker(my_lock)
     def add_event_group(self, group_name):
         rv = self.recent_node.add_child(header=group_name, node_type=NodeType.Step)
         rv.log = self.case_logger if self.case_logger is not None else self.logger
@@ -136,11 +153,10 @@ class ResultReporter:
         return rv
 
     @locker(my_lock)
-    def end_step_group(self):
-        self.pop()
-
-    @locker(my_lock)
     def add_test(self, case_name):
+        """
+        加入当前节点清单
+        """
         self.recent_node = self.recent_node.add_child(header=case_name, node_type=NodeType.Case)
         self.recent_case = self.recent_node
         self._log_info(f"[Test Case] {case_name}")
@@ -199,7 +215,8 @@ class ResultReporter:
 
 class ResultNode:
     """
-    测试结果节点
+    测试结果节点:
+        利用树形结构进行表示
     """
 
     def __init__(self, header, message="", status=None, parent=None, node_type=NodeType.Other):
@@ -210,8 +227,8 @@ class ResultNode:
         @param parent: 父节点
         @param node_type: 节点类型
         """
-        self.header = header  # 简短的描述信息
-        self.message = message  # 具体的描述信息
+        self.header = header  # 简短描述信息
+        self.message = message  # 具体描述信息
         self.status = StepResult.INFO if status is None else status  # 节点状态
         self.children = []  # 节点的子节点
         self.parent = parent  # 节点的父节点
@@ -235,7 +252,7 @@ class ResultNode:
 
     def add(self, status, header, message=""):
         """
-        简化的add方法，提供给事件驱动
+        简化的add方法，提供给事件驱动使用
         """
         self.add_child(header, status, message, NodeType.Step)
         if self.log:
@@ -244,8 +261,6 @@ class ResultNode:
     def set_status(self, status):
         """
         设置当前节点的状态, 同时更新父节点的状态
-        # TODO: 当一个步骤失败后, 其父节点应显示为失败
-                原算法是子节点更新状态便更新父节点状态，该处算法可以进行下一步的优化。
         """
         # 不做状态设置的节点判断
         if self.type == NodeType.Other:
@@ -267,14 +282,12 @@ class ResultNode:
         将结果生成字典, 以便JSON格式输出
         @return:
         """
-        ret = []
-        # 添加基本信息
-        ret["header"] = self.header
-        ret["status"] = self.status
-        ret["message"] = self.message
-        ret["type"] = self.type.value
-        ret["children"] = []
-        ret["timestamp"] = self.timestamp
+        ret = {"header": self.header,
+               "status": self.status,
+               "message": self.message,
+               "type": self.type.value,
+               "children": [],
+               "timestamp": self.timestamp}
         # 添加子节点信息
         for child in self.children:
             ret["children"].append(child.to_dict())
@@ -286,7 +299,7 @@ class ResultNode:
         @param indent: 缩进层次
         @return:
         """
-        # 添加初始信息, 缩进层次 和 时间戳
+        # 添加初始信息, 缩进层次和时间戳
         ret = f"{self._get_intent(indent)}[{self.timestamp}]"
 
         # 添加测试用例类别信息
@@ -338,7 +351,7 @@ class ResultNode:
     def get_test_case_stats(self):
         """
         根据当前的结果, 将相应的统计值置为 1 并返回;
-        否则,遍历自己的children属性
+        否则,遍历自己的children属性,递归调用get_test_case_stats
         """
         stats = collections.Counter({
             "stats_pass": 0,
@@ -351,7 +364,7 @@ class ResultNode:
             self.stats_judge(stats)
         else:
             for child in self.children:
-                child_stats = child.get_test_point_stats()
+                child_stats = child.get_test_case_stats()
                 stats.update(child_stats)
         return stats
 
@@ -372,7 +385,9 @@ class ResultNode:
         for child in self.children:
             child_stats = child.get_test_point_stats()
             stats.update(child_stats)
-        if not any(self.children):
+        # 递归至只有到了叶节点,才能返回这个节点的状态
+        # 因为叶子节点的状态会影响所有父节点的状态
+        if not self.is_leaf:
             self.stats_judge(stats)
         return stats
 
@@ -407,7 +422,6 @@ if __name__ == '__main__':
 
     # 添加一个测试步骤节点
     rr.add_step_group("TEST")
-
     rr.add_step_group("Login to website")
     rr.add(StepResult.PASS, "Input Username", "Username is admin")
     rr.add(StepResult.PASS, "Input Password", "Password is admin")

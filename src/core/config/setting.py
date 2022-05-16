@@ -8,18 +8,28 @@
     配置类：
         1. 方便地扩展和定义：我们能够在一个基类上通过继承来实现对配置的扩展，比如不同模块的不同配置项
         2. 实现保存和读取功能：能够将配置类中所有的字段保存到文件，同时能够读通过读取方法来装载配置
+
+    静态配置:
+        1. 可扩展，键值对的方式将配置项保存在文件中，或者通过文件读取配置项
+        2. 统一管理(注册,采用,修改)
+
+    动态配置:
+        1. 绑定的不是一个模块,而是一些运行期间需要持久化或可配置的对象
+        2. 随时保存,随时调用
+        3. 在类的实例的执行过程中添加参数配置
+
 """
 import json
 import os
 from abc import ABCMeta
 from functools import wraps
 
-_DEFAULT_PATH = os.path.join(os.getcwd(), "test_config")
+_DEFAULT_PATH = os.path.join(os.getcwd(), "test_config")  # 配置文件目录，为None则生成默认值
 
 
 class SettingError(Exception):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args)
 
 
 # =====================================
@@ -27,10 +37,14 @@ class SettingError(Exception):
 # =====================================
 class SettingBase(metaclass=ABCMeta):
     """
-    配置基类
+    配置基类，可继承该类来实现
     """
+
     file_name = None
     setting_path = _DEFAULT_PATH
+
+    def __init__(self):
+        pass
 
     @classmethod
     def _get_full_path(cls):
@@ -81,6 +95,7 @@ class SettingBase(metaclass=ABCMeta):
 # =====================================
 class TestSettingBase(SettingBase):
     def __init__(self, setting_path, file_name):
+        super().__init__()
         self.__class__.setting_path = setting_path
         self.__class__.file_name = file_name
 
@@ -92,12 +107,16 @@ class TestSettingBase(SettingBase):
 # =====================================
 class StaticSettingManager:
     """
-    静态配置管理类
+    静态配置管理类，提供
+        1. 统一的注册接口,在所有模块初始化后,添加相应的配置类到settings属性中
+        2. 统一的管理方式,所有配置类的路径管理
+        2. 统一的读取和存储(setting_path变量统一更新)(save_all和load_all方法进行保存和装载)
+    通过操作该类可获得所有的配置信息
     """
 
     def __init__(self):
         self.settings = {}
-        self._setting_path = _DEFAULT_PATH
+        self._setting_path = _DEFAULT_PATH  # 用来保存配置文件的路径
 
     def add_setting(self, setting_name, setting_class):
         """
@@ -144,7 +163,7 @@ class StaticSettingManager:
     # 可修改的setting_path属性
     def setting_path(self, value):
         self._setting_path = value
-        # 更改所有的对象的配置路径
+        # 在赋值的同时,更新所有的对象的配置路径
         for key, setting in self.settings.items():
             setting.setting_path = value
 
@@ -158,7 +177,7 @@ class StaticSettingManager:
 
     def save_all(self):
         """
-        保存所有的配置
+        保存当前已经更新的所有配置
         @return:
         """
         for key, setting in self.settings.items():
@@ -166,7 +185,7 @@ class StaticSettingManager:
 
     def load_all(self):
         """
-        读取所有的配置
+        读取当前已经更新的所有配置
         @return:
         """
         self.sync_path()
@@ -180,12 +199,19 @@ class StaticSettingManager:
 #   配置文件和路径是可以通过外部传入来设置的
 #   类实例化的过程中, 要生成相应的字段(比如settings)来保存配置类
 # 方法: 在类中添加继承自SettingBase的配置类来实现,并使用该装饰器来添加实例化过程中对配置的初始化和装载
+# 使用: 使用dynamic_setting装饰器, 并继承SettingBase
 # =====================================
 def dynamic_setting(cls):
+    """
+    1. 被装饰后的函数已经是另外一个函数了（函数名等函数属性会发生改变）
+    2. 使用wraps可以保留原有函数的名称和docstring
+    """
     @wraps(cls)  # 解决函数的名字变成装饰器中的包装器导致的原函数属性失效问题
     def inner(*args, **kwargs):
         """这个装饰器用于需要添加配置的类，在类的实例化过程中调用
-
+            1. 对被装饰类的__dict__进行判断,找其父类为SettingBase的类
+            2. 利用setattr设置成该类实例的一个属性
+            3. 判断有无setting_path和setting_file的属性,无则默认
         @param args:
         @param kwargs:
         @return:
@@ -219,6 +245,4 @@ def dynamic_setting(cls):
 #   通过统一的输入参数实现自己的业务逻辑, 然后通过统一的管理工具来管理其装载,提供给测试引擎统一调用
 #   代码路径: core/config/logic_module.py
 # =====================================
-
-
 static_setting = StaticSettingManager()

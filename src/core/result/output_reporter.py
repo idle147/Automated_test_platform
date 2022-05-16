@@ -4,7 +4,11 @@ import os
 import time
 from enum import Enum
 
-# TODO: 待优化
+""" 
+    输出测试结果
+        1. 使用with语句进行层次处理与异常控制
+        2. 使用树形的结果输出
+"""
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -25,13 +29,16 @@ class StepEnd(Exception):
 
 class NodeEntry:
     """
-    代表一般节点，比如测试列表
+    代表一般节点，比如测试根节点或测试列表
     """
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+            判断是否由异常产生
+        """
         if exc_tb:
             self.message += str(exc_tb)
 
@@ -39,11 +46,17 @@ class NodeEntry:
         self.headline = headline
         self.message = message
         self.parent = parent
-        self.children = list()
+        self.children = []
         self.timestamp = time.localtime()
         self.update_action = update_action
 
+    def __str__(self):
+        return self.headline + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]" + os.linesep
+
     def start_node(self, headline, message=""):
+        """
+            用于产生新的普通节点
+        """
         ret = NodeEntry(headline, parent=self, message=message, update_action=self.update_action)
         self.children.append(ret)
         if self.update_action is not None:
@@ -51,6 +64,9 @@ class NodeEntry:
         return ret
 
     def start_case(self, headline):
+        """
+            用于产生新的测试用例节点
+        """
         ret = CaseEntry(headline, parent=self)
         ret.update_action = self.update_action
         self.children.append(ret)
@@ -75,19 +91,17 @@ class NodeEntry:
             ret += child.get_friend_print(indent + 4)
         return ret
 
-    def __str__(self):
-        return self.headline + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]" + os.linesep
-
 
 class CaseEntry(NodeEntry):
     """
-    代表测试用例的节点
+    描述测试用例的节点
     """
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # 没有异常,直接更新
         if exc_type is None:
             self.update_result()
             if self.result is None:
@@ -95,15 +109,20 @@ class CaseEntry(NodeEntry):
             if self.update_action:
                 self.update_action()
             return
+
+        # 用例开发者主动设置了测试用例的状态
         if exc_type is StepEnd:
             self.result = exc_val.result
             if self.result != ResultType.PASS:
                 self.message += exc_tb
+        # 遇到了未知的异常,在此处处理
         else:
             self.result = ResultType.ERROR
             self.message = str(exc_tb)
+
         if self.update_action:
             self.update_action()
+
         return True
 
     def __str__(self):
@@ -119,6 +138,9 @@ class CaseEntry(NodeEntry):
         return ret
 
     def start(self, headline, message, prefix=None):
+        """
+            生成步骤节点
+        """
         entry = CaseStepEntry(headline=headline, parent=self, message=message)
         entry.update_action = self.update_action
         if prefix is not None:
@@ -223,6 +245,10 @@ class CaseStepEntry(CaseEntry):
         self._continue = _continue
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+            1. 如果没有异常, 根据update_result()确定结果
+            2. 如果异常为StepEnd,根据_continue变量决定异常是否继续传递
+        """
         if exc_type is None:
             self.update_result()
             if self.result is None:
@@ -242,7 +268,8 @@ class CaseStepEntry(CaseEntry):
             return self._continue
 
     def __str__(self):
-        if self.step_prefix == "COLLECT_RESOURCE" or self.step_prefix == "SETUP" or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP":
+        if self.step_prefix == "COLLECT_RESOURCE" or self.step_prefix == "SETUP" \
+                or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP":
             headline = self.step_prefix + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]"
         else:
             headline = "STEP-" + self.step_prefix + str(self.step_no) + ": " + self.headline + \
@@ -253,7 +280,8 @@ class CaseStepEntry(CaseEntry):
         entry = CaseStepEntry(headline=headline, parent=self, message=message, _continue=_continue)
         if prefix is not None:
             entry.step_prefix = prefix
-        elif self.step_prefix == "SETUP" or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP" or self.step_prefix == "COLLECT_RESOURCE":
+        elif self.step_prefix == "SETUP" or self.step_prefix == "TEST" \
+                or self.step_prefix == "CLEANUP" or self.step_prefix == "COLLECT_RESOURCE":
             entry.step_prefix = ""
         else:
             entry.step_prefix = self.step_prefix + str(self.step_no) + "-"
@@ -322,18 +350,18 @@ if __name__ == "__main__":
     with rr.root.start_node("测试列表") as testlist:
         with testlist.start_case("test_feature_001") as case:
             with case.start(headline="", message="", prefix="SETUP") as step:
-                with step.start("设置浏览器", "启动浏览器，选择chrome") as sub_step:
-                    sub_step.passed("成功设置浏览器")
-                with step.start("登录系统", "输入用户名密码") as sub_step:
-                    sub_step.passed("登录成功")
+                with step.start("设置浏览器", "启动浏览器，选择chrome") as substep:
+                    substep.passed("成功设置浏览器")
+                with step.start("登录系统", "输入用户名密码") as substep:
+                    substep.passed("登录成功")
             with case.start(headline="", message="", prefix="TEST") as step:
-                with step.start("测试步骤1", "第一个测试步骤") as sub_step:
-                    with sub_step.start("一个pass的子步骤", "") as ssubstep:
+                with step.start("测试步骤1", "第一个测试步骤") as substep:
+                    with substep.start("一个pass的子步骤", "") as ssubstep:
                         pass
-                with step.start("一个异常的步骤", "", _continue=True) as sub_step:
-                    1 / 0  # 造成异常
-                with step.start("继续测试步骤", "") as sub_step:
-                    sub_step.passed("成功")
+                with step.start("一个异常的步骤", "", _continue=True) as substep:
+                    var = 1 / 0  # 造成异常
+                with step.start("继续测试步骤", "") as substep:
+                    substep.passed("成功")
             with case.start(headline="", message="", prefix="CLEANUP") as step:
                 step.passed("执行清理")
 

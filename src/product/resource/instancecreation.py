@@ -56,7 +56,7 @@ if __name__ == '__main__':
              "password": "admin"}
             )
     # 获取符合约束的资源
-    telnet_resource = rp.collect_device(device_type="telnet", count=1)[0]
+    telnet_resource = rp.collect_device_info(device_type="telnet", count=1)[0]
     # 获取具体资源的实例化句柄
     telnet_client = telnet_resource.get_comm_instance()
     print(telnet_client.host)

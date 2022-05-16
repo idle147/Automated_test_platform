@@ -12,6 +12,19 @@ import time
 
 from core.tool.file_tool import FileTool
 
+""" 
+    输出日志信息
+        1. 测试平台日志：集中注册管理，通过模块注册的日志统一输出日志文件
+        2. 测试用例日志：集中注册管理，其日志生成时同时输出该阶段的测试平台日志
+        
+    日志文件设计到的参数
+        1. 保存日志的路径、模块名称
+        2. 模块日志输出等级
+        3. 日志文件模式: 允许日志文件名称随意修改,考虑同名日志进行追加或者新建
+        4. 日志文件大小: 分段、覆盖、清理
+        5. 日志文件打包: 对日志文件进行压缩
+"""
+
 logger_level = {
     "INFO": logging.INFO,
     "WARNING": logging.WARNING,
@@ -27,15 +40,23 @@ class LoggerManager:
         # 用于记录logger的配置信息
         self.logger_info = {}
 
-    def register(self, logger_name, file_path=None, console=True,
+    def register(self, logger_name, filename=None, console=True,
                  default_level=logging.INFO, **kwargs):
         """
         注册logger
         @param logger_name: 日志实例的名称, 唯一表示
-        @param file_path: 文件路径, 必须是一个绝对路径或者相对路径,而不能是单独的文件名
+        @param filename: 文件路径, 必须是一个绝对路径或者相对路径,而不能是单独的文件名
         @param console: 是否输出到控制台
         @param default_level: 默认输出等价
-        @param kwargs: 其他参数
+        @param kwargs: {
+                            format:输出条目格式
+                            zip:是否需要打包
+                            max_file:最大文件数量
+                            size_limit:文件大小
+                            mode:日志文件产生模式
+                            for_test: 表示注册的模块需要在测试用例执行期间同时向测试用例所在的日志目录输出日志信息
+                            is_test: 表示该日志是一个测试用例日志
+                        }
         @return:
         """
 
@@ -44,11 +65,7 @@ class LoggerManager:
         max_files = kwargs.get("max_files", None)  # 最大文件数
         file_mode = kwargs.get("mode", "w")  # 日志产生模式, 追加还是新建
 
-        """
-            for_test: 表示注册的模块需要在测试用例执行期间， 同时向测试用例所在的日志目录输出日志信息
-            is_test: 表示该日志是一个测试用例日志
-            当我们注册一个新的测试用例的日志输出时, 所有相关的其他模块的日志都会向测试用例目录输出测试用例执行期间所产生的日志
-        """
+        # 当我们注册一个新的测试用例的日志输出时, 所有相关的其他模块的日志都会向测试用例目录输出测试用例执行期间所产生的日志
         for_test = kwargs.get("for_test", False)  # 日志对测试用例开放
         is_test = kwargs.get("is_test", False)  # 日志是测试用例日志
 
@@ -58,43 +75,40 @@ class LoggerManager:
             log_format = "[%(asctime)s][%(name)s]-<thread:%(thread)s>-(line:%(lineno)s), [%(levelname)s]: %(message)s"
 
         # 获取新的logger实例
-        logger = logging.getLogger(logger_name)
-        self.logger_info[logger_name] = {}
-        self.logger_info[logger_name].update({
-            'timestamp': time.localtime(),
-            'for_test': for_test,
-            'is_test': is_test
-        })
+        logger_handle = logging.getLogger(logger_name)
+        self.logger_info[logger_name] = {'timestamp': time.localtime(),
+                                         'for_test': for_test,
+                                         'is_test': is_test}
 
         # 指定了存放日志的文件路径
-        if file_path:
-            FileTool.check_and_create_directory(file_path)
+        if filename:
+            FileTool.check_and_create_directory(filename)
             self.logger_info[logger_name].update({
-                'file_path': os.path.dirname(file_path),
-                'file_name': os.path.basename(file_path),
+                'file_path': os.path.dirname(filename),
+                'file_name': os.path.basename(filename),
                 'zip': zip_logger
             })
 
             # 日志文件句柄的定义
             if max_files:
                 file_handler = logging.handlers.RotatingFileHandler(
-                    filename=file_path,
+                    filename=filename,
                     mode=file_mode,
                     maxBytes=file_size_limit,  # 将文件按照最大大小进行分割
                     backupCount=max_files)  # 实现日志文件自动备份
             else:
-                file_handler = logging.FileHandler(file_path, mode=file_mode)  # 按照指定格式，获取日志文件流句柄
-
+                file_handler = logging.FileHandler(filename, mode=file_mode)  # 按照指定格式，获取日志文件流句柄
             file_handler.setFormatter(logging.Formatter(fmt=log_format))
-            logger.addHandler(file_handler)
+            logger_handle.addHandler(file_handler)
 
+            # 是否需要输出到测试用例日志所在的目录
             if is_test:
                 for l_logger, l_value in self.logger_info.items():
                     # 需要是一个注册了日志文件的模块才能向测试用例输出日志
                     if l_value['for_test'] and "file_name" in l_value:
                         logger_filename = os.path.join(
-                            os.path.dirname(file_path), f"{l_logger}.log")
-                        # 为该日志添加一个新的FileHandler来输出该模块的日志到测试用例日志所在的目录
+                            os.path.dirname(filename), f"{l_logger}.log")
+                        # 为该日志添加一个新的FileHandler，输出该模块的日志到测试用例日志所在的目录
                         case_handler = logging.FileHandler(logger_filename, mode="w")
                         case_handler.setFormatter(logging.Formatter(fmt=log_format))
                         l_value['case_handler'] = case_handler
@@ -104,11 +118,11 @@ class LoggerManager:
         if console:
             stream_handler = logging.StreamHandler()
             stream_handler.setFormatter(logging.Formatter(fmt=log_format))
-            logger.addHandler(stream_handler)
+            logger_handle.addHandler(stream_handler)
 
-        logger.setLevel(default_level)  # 设置日志等级
-        self.logger_info[logger_name]['logger'] = logger  # 设置日志的实例化对象
-        return logger
+        logger_handle.setLevel(default_level)  # 设置日志等级
+        self.logger_info[logger_name]['logger'] = logger_handle  # 设置日志的实例化对象
+        return logger_handle
 
     def unregister(self, logger_name):
         """
@@ -162,10 +176,12 @@ if __name__ == "__main__":
     # 并将日志实例注入测试用例实例中(复用用例存放路径)
     # 这样测试用例开发者便无需关注日志存放的位置
     # =====================================
+
     # 注册日志
+    #    生成两个目录，log_test目录（module日志文件），test_case目录（一个是test1.log文件，另一个是demo_case.log文件）
     log1 = logger.register(r"Module", os.path.join(log_file_path, "log_test", "test1.log"),
                            for_test=True, zip=False)
-    case_logger = logger.register("Test_Case", os.path.join(log_file_path, "test_case", "democase.log"),
+    case_logger = logger.register("Test_Case", os.path.join(log_file_path, "test_case", "demo_case.log"),
                                   is_test=True, zip=False)
 
     # 写入日志

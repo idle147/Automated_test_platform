@@ -14,6 +14,7 @@ import json
 import os
 import time
 
+from core.config.setting import static_setting, SettingBase
 from core.resource.constraints import ConnectionConstraint
 from core.resource.error import ResourceError, ResourceNotMeetConstraint
 from core.resource.setting import ResourceSetting
@@ -48,6 +49,78 @@ def register_resource(category, resource_type, comm_callback):
         _resource_port_mapping[resource_type] = comm_callback
     elif category == "port":
         _resource_port_mapping[resource_type] = comm_callback
+
+
+class DevicePort:
+    """ 代表设备的连接端口
+    Attributes:
+        parent: 用以保存其父的对象实例
+    """
+
+    def __init__(self, parent_device=None, name="", *args, **kwargs):
+        self.parent = parent_device
+        self.name = name
+        self.type = kwargs.get("type", None)
+        self.description = kwargs.get("description", None)
+        self.remote_ports = []
+        self._instance = None
+
+    def get_comm_instance(self, new=False):
+        """
+        获取测试资源的实例化句柄
+        @param new:
+        @return:
+        """
+        if self.type not in _resource_port_mapping:
+            raise ResourceError(f"类型 {self.type} 尚未注册")
+        if not new and self._instance:
+            return self._instance
+        else:
+            self._instance = _resource_port_mapping[self.type](self)
+        return self._instance
+
+    def to_dict(self):
+        """序列化方法
+        传统的序列化方法__dict__: 1.无法实例化类实例所对应的内存地址; 2.在做反序列化的时候无法确定实例的类型; 3. 无法递归处理
+        解决方法: 循环遍历所有的属性,如果需要parent和remote_port字段,则特殊处理。[只存储parent的名称,以及远端端口实例化的parent和端口名称,以避免递归]
+        @return:
+            序列化对象
+        """
+        ret = {}
+        for key, value in self.__dict__.items():
+            if key == "parent":
+                ret[key] = value.name
+            elif key == "remote_ports":
+                ret[key] = []
+                for remote_port in value:
+                    # 使用device的名称和port的名称来表示远端的端口
+                    # 在反序列化的时候可以方便地找到相应的对象实例
+                    ret[key].append(
+                        {
+                            "device": remote_port.parent.name,
+                            "port": remote_port.name
+                        }
+                    )
+            else:
+                ret[key] = value
+        return ret
+
+    @staticmethod
+    def from_dict(dict_obj, parent):
+        """ 反序列化方法
+        
+        @param
+            dict_obj: 序列化后的字符串
+        @return
+            序列化后的对象
+        """
+        ret = DevicePort(parent)
+        # 除remote_ports和parent外,将字典中所有的key设置成该实例的属性
+        for key, value in dict_obj.items():
+            if key == "remote_ports" or key == "parent":
+                continue
+            setattr(ret, key, value)  # 设置属性值
+        return ret
 
 
 class ResourceDevice:
@@ -118,78 +191,6 @@ class ResourceDevice:
                 setattr(ret, key, value)
             else:
                 setattr(ret, key, value)
-        return ret
-
-
-class DevicePort:
-    """ 代表设备的连接端口
-    Attributes:
-        parent: 用以保存其父的对象实例
-    """
-
-    def __init__(self, parent_device=None, name="", *args, **kwargs):
-        self.parent = parent_device
-        self.name = name
-        self.type = kwargs.get("type", None)
-        self.description = kwargs.get("description", None)
-        self.remote_ports = []
-        self._instance = None
-
-    def get_comm_instance(self, new=False):
-        """
-        获取测试资源的实例化句柄
-        @param new:
-        @return:
-        """
-        if self.type not in _resource_port_mapping:
-            raise ResourceError(f"类型 {self.type} 尚未注册")
-        if not new and self._instance:
-            return self._instance
-        else:
-            self._instance = _resource_port_mapping[self.type](self)
-        return self._instanc
-
-    def to_dict(self):
-        """序列化方法
-        传统的序列化方法__dict__: 1.无法实例化类实例所对应的内存地址; 2.在做反序列化的时候无法确定实例的类型; 3. 无法递归处理
-        解决方法: 循环遍历所有的属性,如果需要parent和remote_port字段,则特殊处理。[只存储parent的名称,以及远端端口实例化的parent和端口名称,以避免递归]
-        @return:
-            序列化对象
-        """
-        ret = {}
-        for key, value in self.__dict__.items():
-            if key == "parent":
-                ret[key] = value.name
-            elif key == "remote_ports":
-                ret[key] = []
-                for remote_port in value:
-                    # 使用device的名称和port的名称来表示远端的端口
-                    # 在反序列化的时候可以方便地找到相应的对象实例
-                    ret[key].append(
-                        {
-                            "device": remote_port.parent.name,
-                            "port": remote_port.name
-                        }
-                    )
-            else:
-                ret[key] = value
-        return ret
-
-    @staticmethod
-    def from_dict(dict_obj, parent):
-        """ 反序列化方法
-        
-        @param
-            dict_obj: 序列化后的字符串
-        @return
-            序列化后的对象
-        """
-        ret = DevicePort(parent)
-        # 除remote_ports和parent外,将字典中所有的key设置成该实例的属性
-        for key, value in dict_obj.items():
-            if key == "remote_ports" or key == "parent":
-                continue
-            setattr(ret, key, value)  # 设置属性值
         return ret
 
 
@@ -290,7 +291,7 @@ class ResourcePool:
                 root_object['device'][device_key] = device.to_dict()
             json.dump(root_object, file, indent=4)
 
-    def collect_device(self, device_type, count, constraints=[]):
+    def collect_device(self, device_type, count, constraints=None):
         """
         获取 指定数量的 资源设备信息
         @param device_type: 获取的资源设备的信息
@@ -298,6 +299,8 @@ class ResourcePool:
         @param constraints: 约束类对象, 对测试资源进行合法性校验
         @return:
         """
+        if constraints is None:
+            constraints = []
         ret = []
         for key, value in self.topology.items():
             if value.type == device_type:
@@ -312,13 +315,15 @@ class ResourcePool:
         else:  # 如果条件一直不满足，则执行该语句
             return []
 
-    def collect_device(self, device_type, constraints=[]):
+    def collect_device_info(self, device_type, constraints=None):
         """
         获取所有的资源设备信息
         @param device_type: 获取的资源设备的信息
-        @param count: 获取的资源设备的数量
+        @param constraints: 获取的资源设备的数量
         @return:
         """
+        if constraints is None:
+            constraints = []
         ret = []
         for key, value in self.topology.items():
             if value.type == device_type:
@@ -330,14 +335,16 @@ class ResourcePool:
                     ret.append(value)
         return ret
 
-    def collect_connection_route(self, resource, constraints=[]):
+    @staticmethod
+    def collect_connection_route(resource, constraints=None):
         """ 根据资源选择符合资源的资源限制器
         获取资源连接路由: 在做资源条件判断时(确定资源限制),就将这些符合条件的设备返回给[测试用例开发者]
         @parm resource: 资源
         @param constraints: 连接限制
-
         """
         # 限制类必须是连接限制ConnectionConstraint
+        if constraints is None:
+            constraints = []
         for constraint in constraints:
             if not isinstance(constraint, ConnectionConstraint):
                 raise ResourceError("collect_connection_route 仅接受 ConnectionConstraints 类型")
@@ -351,6 +358,18 @@ class ResourcePool:
             for conn in conns:
                 ret.append(conn)
         return ret
+
+
+@static_setting.setter("ResourceSetting")
+class ResourceSetting(SettingBase):
+    """
+        资源配置模块的配置类
+        当该模块被引用时, 执行static_setting的装饰器函数(setter)
+        即在赋值的同时,更新所有的对象的配置路径
+    """
+    file_name = "resource_setting.setting"
+    resource_path = os.path.join(os.environ['HOME'], "test_resource")
+    auto_connect = False
 
 
 if __name__ == '__main__':

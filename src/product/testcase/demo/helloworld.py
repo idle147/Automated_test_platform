@@ -16,7 +16,7 @@ class HelloWorldTest(TestCaseBase):
 
     def collect_resource(self, pool: ResourcePool):
         self.reporter.add_step_group("Collect Resources")
-        self.ap = pool.collect_device("AP", 1)[0]
+        self.ap = pool.collect_device_info("AP", 1)[0]
         self.reporter.end_step_group()
 
     def setup(self):

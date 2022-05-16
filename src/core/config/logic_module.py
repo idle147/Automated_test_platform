@@ -15,6 +15,13 @@ from core.config.setting import static_setting, SettingBase
 from core.resource.pool import ResourcePool
 from core.result.reporter import ResultReporter
 
+"""
+    带逻辑功能的配置:
+        1. 主要用于:测试用例执行前后或者执行时,所需要的配置
+        2. 通过外部设置来决定是否执行某些逻辑
+        3. 通过统一的输入参数实现自己的业务逻辑,并通过统一的管理工具进行管理以提供测试引擎统一调用
+"""
+
 
 class ModuleType(Enum):
     PRE = 1  # 表示在测试用例执行前运行该模块
@@ -28,6 +35,9 @@ class ModuleType(Enum):
 class ModuleBase(metaclass=ABCMeta):
     """逻辑配置模块的基类
     模块的开发者通过调用这些实例,对测试资源进行操作并输出结果
+    1. 在初始化时需要将测试报告实例和测试资源实例传递给模块
+    2. priority：用于对模块的执行顺序进行排序
+    3. thread：用于保存并行执行的模块的执行进程
     """
     module_type = None
     priority = 99
@@ -87,7 +97,7 @@ class ModuleManager:
     """
 
     def __init__(self):
-        self.modules = {}  # 用以保存装载的逻辑配置类
+        self.modules = {}  # 用以保存装载的逻辑配置类，实例则是通过资源配置实例及测试报告实例来创建
 
     def load(self):
         """
@@ -161,8 +171,7 @@ class ModuleManager:
         将所有模块信息保存到模块配置列表
         @return:
         """
-        obj = {}
-        obj['modules'] = []
+        obj = {'modules': []}
         for m_key, m_value in self.modules.items():
             obj['modules'].append({
                 "name": m_key,
