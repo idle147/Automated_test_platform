@@ -79,6 +79,8 @@ class ResultReporter:
         # 失败回滚
         self.recent_case = None  # 当前测试用例标识符,为None表示添加失败
         self.recent_list = None  # 测试节点列表
+
+        # 失败中断
         self.halt_on_failure = False  # 失败停止标识符
         self.halt_on_exception = False  # 异常停止标识符
         self.halt_on_stop = False  # 中止停止标识符

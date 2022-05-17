@@ -6,10 +6,15 @@
 # @File: caserunner.py
 
 """
-Test Engine
+  测试引擎: 对输入的测试配置、测试资源、测试用例进行统一调度和执行
 """
 
 # =====================================
+# 测试用例与测试引擎的关系
+#   1. 测试用例遵循四部测试法来设计测试用例的基类，
+#   2. 通过装饰器给测试用例增加属性配置
+#   3. 测试用例通过测试列表传递给测试引擎
+
 # 一个好的测试引擎:
 #   1. 希望测试用例能够实时输出正在执行的步骤
 #   2. 测试用例执行失败时,可以挂起测试
@@ -31,6 +36,10 @@ Test Engine
 #   1. 实例化所有继承了TestCaseBase配置类 的测试用例类
 #   2. 根据配置的文件路径, 读取配置信息
 #   3. 动态赋值给测试用例的setting字段
+#   4. 通过判断标识位，让测试用例优雅的中止
+#   5. 用例步骤执行失败是，人为阻塞挂起线程
+#   6. 对测试用例中没有捕获的异常进行记录和控制
+#   7。 根据测试列表设置的配置条件，对测试用例进行过滤和重排
 #
 # 测试引擎执行测试用例的最小单位是 测试列表
 # =====================================
@@ -54,7 +63,9 @@ from core.tool.time_tool import TimeTool
 @static_setting.setting("CaseRunner")
 class CaseRunnerSetting(SettingBase):
     """
-    The case runner setting
+        为测试引擎模块注册一个静态配置实例
+        以下是常用配置项(可修改)
+        静态配置管理器会统一执行装载的方法
     """
     dir_path = os.path.abspath(os.path.join(os.getcwd(), "../.."))
     default_case_setting_path = os.path.join(dir_path, "settings", "test_settings")  # 默认的测试用例存放路径
@@ -81,7 +92,8 @@ class RunningStatus(Enum):
 
 class CaseRunner:
     """
-    测试用例执行器
+    测试用例执行器(测试引擎模块)
+        1. 进行配置实例化、测试资源实例化、测试用例列表和测试用例实例化
     """
 
     def __init__(self):
@@ -151,8 +163,12 @@ class CaseRunner:
     def load_test(self, test_name) -> TestCaseBase:
         """
         动态实例化测试用例
+        1. 为每个测试用例建立一个描述字典case_descriptor
+        2. 通过load_test动态地引用测试用例
+        3. 对测试用例实例化后, 存储关键信息
+        4. 遍历测试用例地子列表,递归调用_import_list_case方法,装载子列表地测试用例
         """
-        # 获取测试用例的模块名和类名
+
         case_module_name = ".".join(test_name.split(".")[0: -1])
         case_name = test_name.split(".")[-1]
         # 动态引用测试用例
@@ -172,7 +188,7 @@ class CaseRunner:
         self.list_setting = None
         self.case_tree.clear()
         # 载入测试列表
-        self._import_list_case(self.case_tree, self.test_list)
+        self._import_list_case(case_tree_node=self.case_tree, test_list=self.test_list)
         # 判断该列表是否需要有优先级需求
         if any(self.test_list.setting.priority_to_run):
             self.priority_list = self.test_list.setting.priority_to_run
@@ -202,6 +218,11 @@ class CaseRunner:
     # =====================================
     # 测试用例流程控制
     #   开始 -> 前置条件判断 -> 逻辑模块装载 -> 获取资源 -> setup -> code_test -> cleanup -> 测试用例执行结束
+    #   测试用例通过前置条件判断
+    #   测试引擎将ResourcePool的实例通过collect_resource方法传递给测试用例
+    #   用户利用ResourcePool中的方法,通过约束条件获取测试资源
+    #       不满足: 中止测试,抛出异常交由测试引擎处理
+    #       满足: 执行后续步骤
     # =====================================
     def run_case_lcm(self, test: TestCaseBase):
         """
@@ -223,7 +244,7 @@ class CaseRunner:
         """
         递归导入测试列表中的测试用例
         @param case_tree_node:构建测试列表和测试用例的信息
-        @oarm test_list: 测试列表
+        @oaram test_list: 测试列表
         """
         # 测试日志文件路径载入
         case_log_path = test_list.test_list_name
@@ -318,6 +339,7 @@ class CaseRunner:
 
     def __main_test_thread(self):
         try:
+            # 递归执行子列表
             self.__run_test_list(self.case_tree)
         finally:
             self.status = RunningStatus.Idle
@@ -333,16 +355,15 @@ class CaseRunner:
         # 执行子测试用例
         for test in testlist['test_cases']:
             test["case"].get_setting(test["setting_path"], test["setting_file"])
-            # 为每个测试用例注册一个日志实例, 输出到相应的测试用例目录中
+            # 1. 为每个测试用例注册一个日志实例, 输出到相应的测试用例目录中
             self.result_report.case_logger = self.__get_case_log(test['log_path'], test['case_name'])
-            # 测试结果初始化
-            self.case_result[test["case_name"]] = dict()
-            self.case_result[test["case_name"]]['priority'] = test["case"].priority
-            self.case_result[test["case_name"]]['result'] = False
-            # 执行测试用例生命周期管理
+            # 2. 测试结果初始化
+            self.case_result[test["case_name"]] = {'priority': test["case"].priority,
+                                                   'result': False}
+            # 3. 执行测试用例生命周期管理
             self.run_case_lcm(test['case'])
             self.result_report.case_logger = None
-            # 释放用例的日志文件
+            # 4. 释放用例的日志文件
             logger.unregister(test['case_name'])
 
         # 递归调用子测试用例
@@ -354,6 +375,11 @@ class CaseRunner:
     def __run_case(self, test: TestCaseBase):
         """
         测试用例执行线程
+            1. 执行collect_resource方法,使用ResourcePool实例提供资源
+                    资源满足: 继续
+                    不满足: 捕获异常
+            2. 执行后续方法, 主线程使用join等待线程执行完毕
+            3. 发送中止信号给逻辑模块装载线程
         """
         self.result_report.add_test(test.__class__.__name__)
         _continue = True

@@ -94,10 +94,19 @@ class SettingBase(metaclass=ABCMeta):
 # 2. 通过实例化的方法动态地修改文件名及路径, 以便在相同地测试用例使用不同地配置实例地时候, 将存放地配置文件用不同地文件名命名
 # =====================================
 class TestSettingBase(SettingBase):
+    """
+    此处,不使用dynamic_setting装饰器, 希望将配置的文件名及路径隐藏起来,并交给测试引擎来控制
+    通过实例化的方法动态地修改文件名及路径,以便在相同的测试用例使用不同的配置实例时,将存放配置文件用不同文件名命名
+
+    1. 实现对测试用例外部参数的输入
+    2. 给每个配置参数添加默认值
+    """
+
     def __init__(self, setting_path, file_name):
         super().__init__()
         self.__class__.setting_path = setting_path
         self.__class__.file_name = file_name
+
 
 
 # =====================================
@@ -206,6 +215,7 @@ def dynamic_setting(cls):
     1. 被装饰后的函数已经是另外一个函数了（函数名等函数属性会发生改变）
     2. 使用wraps可以保留原有函数的名称和docstring
     """
+
     @wraps(cls)  # 解决函数的名字变成装饰器中的包装器导致的原函数属性失效问题
     def inner(*args, **kwargs):
         """这个装饰器用于需要添加配置的类，在类的实例化过程中调用

@@ -12,6 +12,13 @@ from flask_restplus import Namespace, reqparse, Resource
 
 from controller.manager import *
 
+"""
+    API实现: 继承RESTPlus中的Resource
+    API组成: namespace(命名空间)
+            Route(注册每个API的URI路径)
+    API请求: 实现相应的HTTP中定义METHOD名字的方法
+"""
+
 # 设置命名空间
 name_space = Namespace("case-runner", description="Case Runner")
 
@@ -38,7 +45,7 @@ class CaseRunnerApi(Resource):
     代表了测试执行的api
     """
 
-    @name_space.expect(runner_param)
+    @name_space.expect(runner_param)  # 异常处理装饰器
     @name_space.response(202, "Case Start Running")
     @name_space.response(400, "Wrong Parameters")
     def put(self):
@@ -56,7 +63,9 @@ class CaseRunnerApi(Resource):
 
 @name_space.route("/testlist")
 class TestListApi(Resource):  # 路径为"/case-runner/testlist"
-
+    """
+        实现测试结果的动态获取、静态配置的设置和保存
+    """
     @name_space.response(200, "Load Test List")
     @name_space.response(400, "Wrong Parameters")
     @name_space.response(500, "Error")

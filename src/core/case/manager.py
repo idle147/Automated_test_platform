@@ -15,6 +15,10 @@ import os
 # =====================================
 from importlib import import_module
 
+"""
+    自动发现测试用例: 动态引用 & 静态扫描
+"""
+
 
 # =====================================
 # 动态引用测试用例
@@ -26,20 +30,21 @@ from importlib import import_module
 # =====================================
 def load_cases(package, case_tree):
     """
-    Load the test cases by import.
-    Should ensure all cases have no gram issue.
+    读取测试用例信息的方法
     :param package: 测试用例所在的根目录
     :param case_tree: 字典, 模块被引用后产生的对象包含__spec__属性
     :return:
     """
+    # 这个包是一个文件夹，我们才继续查找其所包含的文件
     module = import_module(package)
 
+    # origin保存了该模块文件的路径
     if module.__spec__.origin is None:
         return
-    # 这个包是一个文件夹，我们才继续查找其所包含的文件
-    # origin保存了该模块文件的路径
+
+    # 如果是一个目录,则包含__init__.py文件
     if os.path.basename(module.__spec__.origin) == "__init__.py":
-        case_tree["sub_module"] = list()
+        case_tree["sub_module"] = []
         case_tree["cases"] = list()
         module_path = os.path.dirname(module.__spec__.origin)
         for file in os.listdir(module_path):
@@ -99,8 +104,8 @@ def load_case_ast(path, case_tree, base_path):
     :param base_path: The base path of the test case
     :return:
     """
-    case_tree["cases"] = list()
-    case_tree["sub_modules"] = list()
+    case_tree["cases"] = []
+    case_tree["sub_modules"] = []
     for file in os.listdir(path):
         if file == "__pycache__":
             continue
@@ -117,13 +122,13 @@ def load_case_ast(path, case_tree, base_path):
             with open(case_file_name) as case_file:
                 file_ast = ast.parse(case_file.read())
             if file_ast:
-                for astobj in file_ast.body:
-                    if isinstance(astobj, ast.ClassDef) and hasattr(astobj, "bases"):
-                        for base_cls in astobj.bases:
+                for ast_obj in file_ast.body:
+                    if isinstance(ast_obj, ast.ClassDef) and hasattr(ast_obj, "bases"):
+                        for base_cls in ast_obj.bases:
                             if base_cls.id == "TestCaseBase":
                                 case_info = dict()
-                                case_info["name"] = case_moudule_name + "." + astobj.name
-                                get_ast_case_info(astobj, case_info)
+                                case_info["name"] = case_moudule_name + "." + ast_obj.name
+                                get_ast_case_info(ast_obj, case_info)
                                 case_tree['cases'].append(case_info)
 
 

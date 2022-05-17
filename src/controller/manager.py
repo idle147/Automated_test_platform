@@ -15,7 +15,7 @@ runner = None
 
 def load_settings(setting_path=None):
     """
-    加载所有静态配置
+    加载所有静态配置, 指定配置的文件路径, 并载入所有配置
     """
     if setting_path:
         static_setting.setting_path = setting_path
@@ -33,7 +33,7 @@ def load_test_list(testlist):
 
 def init_engine():
     """
-    初始化测试引擎
+    初始化测试引擎CaseRunner()
     """
     global runner
     runner = CaseRunner()

@@ -11,6 +11,11 @@ import os
 from core.case.base import TestType
 from core.config.setting import SettingBase, dynamic_setting
 
+"""
+    1. 以测试列表为单位给不同的测试列表内相同的测试用例赋予不同的配置参数
+    2. 测试引擎执行测试用例的最小单位为一个测试列表
+"""
+
 
 class TestListError(Exception):
     """
@@ -77,12 +82,13 @@ class TestList:
     def save(self):
         """
         将测试列表保存成json格式的文件
+        子列表应为一个独立的文件,以便不同的测试列表之间进行任意的组合
         """
-        json_obj = dict()
-        json_obj['name'] = self.test_list_name
-        json_obj['description'] = self.description
-        json_obj['setting_path'] = self.setting_file_path
-        json_obj['cases'] = list()
+        json_obj = {'name': self.test_list_name,
+                    'description': self.description,
+                    'setting_path': self.setting_file_path,
+                    'cases': []}
+
         for testcase in self.test_cases:
             json_obj['cases'].append(testcase)
         json_obj['sublist'] = list()
