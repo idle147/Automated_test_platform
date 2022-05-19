@@ -149,9 +149,13 @@ class ResultReporter:
 
     @locker(my_lock)
     def add_event_group(self, group_name):
+        """
+            给每个线程只分配一个ResultNode对象,这些线程内他们只操作自己的ResultNode
+            添加新的测试节点,而不会对整个测试结果的树结构产生影响
+        """
         rv = self.recent_node.add_child(header=group_name, node_type=NodeType.Step)
         rv.log = self.case_logger if self.case_logger is not None else self.logger
-        self._log_info(f"[Event] {group_name}")
+        self._log_info(f"[事件] {group_name}")
         return rv
 
     @locker(my_lock)
