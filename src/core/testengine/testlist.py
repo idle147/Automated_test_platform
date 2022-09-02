@@ -23,7 +23,7 @@ class TestListError(Exception):
     """
 
     def __init__(self, message, ex=None):
-        super().__init__("测试列表异常:" + message)
+        super().__init__(f"测试列表异常:{message}")
         self.parent = ex
 
 
@@ -51,7 +51,7 @@ class TestList:
         读取测试列表
         """
         if not os.path.exists(self.filepath):
-            raise TestListError("%s [测试列表]无法找到" % self.filepath)
+            raise TestListError(f"{self.filepath} [测试列表]无法找到")
         try:
             testlist_file = open(self.filepath)
             testlist_obj = json.load(testlist_file)
@@ -60,8 +60,11 @@ class TestList:
             self.setting_file_path = testlist_obj['setting_path']
             # 如果没有设置文件路径, 则采用默认路径
             if not self.setting_file_path:
-                self.setting_file_path = os.path.join(os.path.dirname(self.filepath),
-                                                      os.path.basename(self.filepath) + ".settings")
+                self.setting_file_path = os.path.join(
+                    os.path.dirname(self.filepath),
+                    f"{os.path.basename(self.filepath)}.settings",
+                )
+
             # 遍历测试用例加入测试列表
             for testcase in testlist_obj['cases']:
                 self.test_cases.append(testcase)
@@ -77,7 +80,7 @@ class TestList:
                     pass
 
         except Exception as ex:
-            raise TestListError("打开文件%s错误" % self.filepath, ex)
+            raise TestListError(f"打开文件{self.filepath}错误", ex)
 
     def save(self):
         """
@@ -91,7 +94,7 @@ class TestList:
 
         for testcase in self.test_cases:
             json_obj['cases'].append(testcase)
-        json_obj['sublist'] = list()
+        json_obj['sublist'] = []
         for sublist in self.sub_list:
             try:
                 sublist.save()
@@ -102,7 +105,7 @@ class TestList:
             testlist_file = open(self.filepath, mode="w")
             json.dump(json_obj, testlist_file, indent=4)
         except Exception as ex:
-            raise TestListError("无法保存测试列表%s" % self.filepath, ex)
+            raise TestListError(f"无法保存测试列表{self.filepath}", ex)
 
     class TestListSetting(SettingBase):
         """

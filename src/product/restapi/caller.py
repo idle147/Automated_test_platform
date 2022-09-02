@@ -25,8 +25,7 @@ class ProductRestCall(ApiCallBase):
         METHOD: get
         """
         api_path = "product"
-        response = self.api.get(api_path)
-        return response
+        return self.api.get(api_path)
 
     @response_schema("201", ProductProductPostResponse201)
     @response_schema("400", ErrorResponse)
@@ -39,12 +38,7 @@ class ProductRestCall(ApiCallBase):
         METHOD: post
         """
         api_path = "product"
-        if isinstance(body, SchemaBase):
-            call_data = body.to_dict()
-        else:
-            call_data = body
-
-        response = self.api.post(api_path, data=call_data)
-        return response
+        call_data = body.to_dict() if isinstance(body, SchemaBase) else body
+        return self.api.post(api_path, data=call_data)
 
 

@@ -53,8 +53,11 @@ class IsTestCaseType(PreConditionBase):
             result_report.add(StepResult.INFO,
                               self.get_description())
         else:
-            result_report.add(StepResult.INFO,
-                              self.get_description() + f",当前测试用例类型是{test_case.test_type}")
+            result_report.add(
+                StepResult.INFO,
+                f"{self.get_description()},当前测试用例类型是{test_case.test_type}",
+            )
+
         return ret
 
     def get_description(self):
@@ -101,11 +104,10 @@ class IsPreCasePassed(PreConditionBase):
         for pre_case in test_case.pre_tests:
             for case, data in self.result_list.items():
                 if pre_case == case:
-                    if not data['result']:
-                        result_report.add(StepResult.INFO, f"{case}的执行结果不成功")
-                        return False
-                    else:
+                    if data['result']:
                         break
+                    result_report.add(StepResult.INFO, f"{case}的执行结果不成功")
+                    return False
             else:
                 result_report.add(StepResult.INFO, f"{pre_case}没有执行")
                 return False

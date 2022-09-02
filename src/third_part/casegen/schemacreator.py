@@ -181,16 +181,11 @@ class ApiCallGenerator(ObjectCreator):
 
         # get server url
         url = self.swagger.description_data[self.swagger.main_file]['servers'][0]['url']
-        protocol = "http"
-        if url.lower().startswith("https"):
-            protocol = "https"
+        protocol = "https" if url.lower().startswith("https") else "http"
         base_url = re.findall("http://.+?/(.+)", url)
         if not any(url):
             base_url = re.findall("https://.+?/(.+)", url)
-        if not any(url):
-            base_url = url
-        else:
-            base_url = base_url[0]
+        base_url = base_url[0] if any(url) else url
         init_method.body.append(
             codedom.ExpressionStatement(
                 codedom.MethodInvokeExpression(
@@ -214,10 +209,10 @@ class ApiCallGenerator(ObjectCreator):
         self.code_statements.append(class_def)
 
     def _gen_api(self, url, api, api_obj):
-        rv = list()
-        for method in api_obj.methods:
-            rv.append(self._get_api_method(url, api, api_obj, method))
-        return rv
+        return [
+            self._get_api_method(url, api, api_obj, method)
+            for method in api_obj.methods
+        ]
 
     def _get_api_method(self, url, api, api_obj, method):
         method_name = api.strip('/').replace('/', '_').replace("-", "_").replace("{", "").replace("}", "")
@@ -243,20 +238,23 @@ class ApiCallGenerator(ObjectCreator):
             rv.args.append(
                 codedom.ParameterDefineExpression(param.replace("$", ""), codedom.NoneExpression())
             )
-        rv.doc = codedom.DocStatement([
-            f"Summary: {method.summary}",
-            f"Description: {method.description}",
-            f"URI: {url + '/' + api.strip('/')}",
-            f"METHOD: {method.method}"
-        ])
+        rv.doc = codedom.DocStatement(
+            [
+                f"Summary: {method.summary}",
+                f"Description: {method.description}",
+                f"URI: {f'{url}/' + api.strip('/')}",
+                f"METHOD: {method.method}",
+            ]
+        )
+
 
         # response decorator
         for code, response in method.responses.items():
             if response.content is not None and isinstance(response.content, ObjectSchemaDataType):
                 schema_name = get_internal_response_schema_name(api, method.method, code)
                 response_obj = \
-                    self.swagger.schema_data[self.swagger.main_file]. \
-                        schema_mapping[f"/components/schemas/{schema_name}"]
+                        self.swagger.schema_data[self.swagger.main_file]. \
+                            schema_mapping[f"/components/schemas/{schema_name}"]
             else:
                 response_obj = self.swagger.get_response_schema(response)
             if response_obj:
@@ -306,14 +304,19 @@ class ApiCallGenerator(ObjectCreator):
                         codedom.MethodInvokeExpression(
                             "append",
                             codedom.BinaryOperatorExpression(
-                                codedom.ConstInvokeExpression(param + "="),
-                                codedom.VariableInvokeExpression(param.replace("$", "")),
-                                "+"
+                                codedom.ConstInvokeExpression(f"{param}="),
+                                codedom.VariableInvokeExpression(
+                                    param.replace("$", "")
+                                ),
+                                "+",
                             ),
-                            instance=codedom.VariableInvokeExpression("query_param_list")
+                            instance=codedom.VariableInvokeExpression(
+                                "query_param_list"
+                            ),
                         )
                     )
                 )
+
             rv.body.append(
                 codedom.ExpressionStatement(
                     codedom.AssignExpression(

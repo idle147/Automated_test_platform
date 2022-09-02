@@ -17,7 +17,7 @@ class Schema:
     def __init__(self, name, schema_data):
         self.schema_data = schema_data
         self.name = name
-        self.code_body = list()
+        self.code_body = []
 
     def gen_dom(self):
         # 类定义

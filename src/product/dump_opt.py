@@ -70,12 +70,12 @@ class ResourceDevice(DumpInterface):
         将配置文件序列化成字典格式
         @return: 序列化后的字典
         """
-        ret = dict()
+        ret = {}
         # 利用迭代的思想, 输入ret
         for key, value in self.__dict__.items():
             # 如果是端口, 端口下有多个子端口, 转换成字典
             if key == 'ports':
-                ret[key] = dict()
+                ret[key] = {}
                 # 对每个子端口, 进行序列化
                 for port_name, port in value.items():
                     ret[key][port_name] = port.to_dict()

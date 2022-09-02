@@ -21,7 +21,7 @@ class ResourceLockPool:
 
     def __init__(self, log=None):
         self.log = log if log is not None else logger.register("ResourceLockPool", default_level="INFO")
-        self.resource = dict()  # 存档资源锁
+        self.resource = {}
 
     def lock(self, resource, event, timeout=60):
         """
@@ -43,16 +43,14 @@ class ResourceLockPool:
         """
         释放资源
         """
-        if resource.name in self.resource:
-            if self.resource[resource.name]['event'] == event:
-                self.log.info(f"Release lock for {resource.name}")
-                self.resource[resource.name]['lock'].set()
-                self.resource.pop(resource.name)
-            else:
-                raise InvalidLockOperation(
-                    f"{resource.name} is locked by {self.resource[resource.name]['event']}")
-        else:
+        if resource.name not in self.resource:
             raise InvalidLockOperation(f'{resource.name} is not locked')
+        if self.resource[resource.name]['event'] != event:
+            raise InvalidLockOperation(
+                f"{resource.name} is locked by {self.resource[resource.name]['event']}")
+        self.log.info(f"Release lock for {resource.name}")
+        self.resource[resource.name]['lock'].set()
+        self.resource.pop(resource.name)
 
 
 if __name__ == "__main__":

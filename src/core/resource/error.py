@@ -8,9 +8,9 @@
 class ResourceNotMeetConstraint(Exception):
     def __init__(self, constraints):
         super().__init__("Resource Not Meet Constraints")
-        self.description = ""
-        for constraint in constraints:
-            self.description += constraint.description + "\n"
+        self.description = "".join(
+            constraint.description + "\n" for constraint in constraints
+        )
 
 
 class ResourceNotMeetConstraintError(Exception):
@@ -28,10 +28,10 @@ class ResourceError(Exception):
 
 class ResourceLoadError(Exception):
     def __init__(self, filename, inner_ex):
-        super().__init__("资源文件%s无法读取" % filename)
+        super().__init__(f"资源文件{filename}无法读取")
         self.inner_ex = inner_ex
 
 
 class ResourceNotRelease(Exception):
     def __init__(self, filename, owner):
-        super().__init__("资源文件被占用%s，使用者为%s" % (filename, owner))
+        super().__init__(f"资源文件被占用{filename}，使用者为{owner}")

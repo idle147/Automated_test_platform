@@ -125,8 +125,8 @@ class ResultReporter:
     def add(self, status: StepResult, headline, message=""):
         self.recent_node.add_child(header=headline, message=message,
                                    status=status, node_type=NodeType.Step)
-        self._log_info("Step: " + headline)
-        self._log_info("Message" + message)
+        self._log_info(f"Step: {headline}")
+        self._log_info(f"Message{message}")
         # 每次添加测试步骤节点时, halt_event复位
         self.halt_event.clear()
         # 判断节点的状态类型, 若失败, 则阻塞线程
@@ -205,12 +205,9 @@ class ResultReporter:
         for child in node.children:
             if child.header == case_name:
                 return child.status
-            else:
-                rv = self._search_result(child, case_name)
-                if rv:
-                    return rv
-        else:
-            return None
+            if rv := self._search_result(child, case_name):
+                return rv
+        return None
 
     def _log_info(self, message):
         if self.case_logger:
@@ -334,10 +331,7 @@ class ResultNode:
 
     @staticmethod
     def _get_dot_line(line, line_max):
-        if len(line) >= line_max:
-            return line
-        else:
-            return "-" * (line_max - len(line))
+        return line if len(line) >= line_max else "-" * (line_max - len(line))
 
     @staticmethod
     def _get_intent(indent):

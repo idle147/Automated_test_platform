@@ -15,7 +15,7 @@ class EventScheduler:
     def __init__(self, reporter: ResultReporter):
         self.reporter = reporter
         self.scheduler = BlockingScheduler()  # 表示调度器在执行时会阻塞当前线程
-        self.events = list()
+        self.events = []
         log_path = static_setting.settings["CaseRunner"].log_path
         log_file = os.path.join(log_path, "event_scheduler_log.log")
         self.log = logger.register("EventScheduler", filename=log_file, for_test=True)
@@ -55,8 +55,7 @@ class EventScheduler:
         """
         移除事件
         """
-        job = self.scheduler.get_job(event_id)
-        if job:
+        if job := self.scheduler.get_job(event_id):
             event_to_remove = None
             for event in self.events:
                 if event.job == job:
@@ -72,9 +71,7 @@ class EventScheduler:
     def _event_listen(self, job):
         for event in self.events:
             if event.job.id == job.job_id:
-                if event.back_ground:
-                    return
-                else:
+                if not event.back_ground:
                     if event.loop_count == 1:
                         return
                     delta = datetime.timedelta(seconds=event.interval)
@@ -83,7 +80,7 @@ class EventScheduler:
                                                        run_date=next_date,
                                                        id=f"{event.name}{uuid.uuid4()}")
                     event.loop_count -= 1
-                    return
+                return
 
 
 if __name__ == "__main__":

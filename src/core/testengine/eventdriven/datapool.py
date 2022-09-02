@@ -5,7 +5,7 @@
 
 class DataPool:
     def __init__(self):
-        self.data = dict()
+        self.data = {}
 
     def save(self, key, value):
         self.data[key] = value

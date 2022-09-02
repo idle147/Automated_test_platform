@@ -51,7 +51,7 @@ class ConstInvokeExpression(ExpressionBase):
         self.const_value = const_value  # 常量名
 
     def to_code(self):
-        if isinstance(self.const_value, int) or isinstance(self.const_value, float):
+        if isinstance(self.const_value, (int, float)):
             return str(self.const_value)
         elif self.const_value is None:
             return "None"
@@ -138,10 +138,8 @@ class MethodInvokeExpression(ExpressionBase):
             if not isinstance(arg, ExpressionBase):
                 raise CodeDomError("Argument should be expression")
         self.method_name = method_name
-        self.arg_list = list()
-        for arg in args:
-            self.arg_list.append(arg)
-        self.obj = kwargs.get("instance", None)
+        self.arg_list = list(args)
+        self.obj = kwargs.get("instance")
 
     def to_code(self):
         if self.obj:
@@ -330,17 +328,17 @@ class MethodDefineStatement(StatementBase):
 
     def __init__(self, method_name, *args):
         self.method_name = method_name
-        self.decorators = list()
-        self.args = list()
+        self.decorators = []
         self.doc = None
-        for arg in args:
-            self.args.append(arg)
-        self.body = list()
+        self.args = list(args)
+        self.body = []
 
     def _to_code(self, indent=0):
-        ret = ""
-        for decorator in self.decorators:
-            ret += f"{_get_indent(indent)}@{decorator.to_code()}\n"
+        ret = "".join(
+            f"{_get_indent(indent)}@{decorator.to_code()}\n"
+            for decorator in self.decorators
+        )
+
         ret += f"{_get_indent(indent)}def {self.method_name}({', '.join([x.to_code() for x in self.args])}):\n"
         if self.doc is not None:
             ret += self.doc.to_code(indent + 1)
@@ -357,14 +355,16 @@ class ClassDefineStatement(StatementBase):
     def __init__(self, class_name, parent=None, doc=None):
         self.class_name = class_name
         self.parent = parent
-        self.decorators = list()
-        self.body = list()
+        self.decorators = []
+        self.body = []
         self.doc = doc
 
     def _to_code(self, indent=0):
-        ret = ""
-        for decorator in self.decorators:
-            ret += f"{_get_indent(indent)}@{decorator.to_code()}\n"
+        ret = "".join(
+            f"{_get_indent(indent)}@{decorator.to_code()}\n"
+            for decorator in self.decorators
+        )
+
         ret += f"{_get_indent(indent)}class {self.class_name}"
         if self.parent is not None:
             ret += f"({self.parent})"
@@ -396,8 +396,8 @@ class IfStatement(StatementBase):
 
     def __init__(self, condition):
         self.condition = condition
-        self.true_statements = list()
-        self.false_statements = list()
+        self.true_statements = []
+        self.false_statements = []
 
     def _to_code(self, indent=0):
         rv = f"{_get_indent(indent)}if {self.condition.to_code()}:\n"

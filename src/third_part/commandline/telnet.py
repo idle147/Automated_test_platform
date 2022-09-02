@@ -63,8 +63,4 @@ class TelnetClient(CommandLine):
         if not ret_data:
             return False
         self.telnet.write(f"{self.password}\n".encode())
-        ret_data = self.telnet.read_until("$".encode())
-        if ret_data:
-            return True
-        else:
-            return False
+        return bool(ret_data := self.telnet.read_until("$".encode()))

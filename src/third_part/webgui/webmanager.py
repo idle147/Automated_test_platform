@@ -16,9 +16,9 @@ class WebElementError(Exception):
 class WebExplorer:
     def __init__(self, explorer_type='random', **config):
         self.type = explorer_type
-        self.download_path = config.get("download_path", None)
+        self.download_path = config.get("download_path")
         self.web_driver = None
-        self.windows = dict()
+        self.windows = {}
         self.recent_type = self.type
 
     def init_driver(self):
@@ -45,8 +45,7 @@ class WebExplorer:
 
     def _init_chrome(self):
         options = ChromeOptions()
-        config = dict()
-        config['profile.default_content_settings.popups'] = 0
+        config = {'profile.default_content_settings.popups': 0}
         if self.download_path:
             config['download.default_directory'] = self.download_path
         options.add_experimental_option("prefs", config)
@@ -99,7 +98,7 @@ class WebExplorer:
 def element(func):
     @wraps(func)
     def inner(*args, **kwargs):
-        selector = dict()
+        selector = {}
         mapping = args[0].__class__.element_mapping
         selector['id'] = mapping[func.__name__].get("id", None)
         selector['xpath'] = mapping[func.__name__].get("xpath", None)
@@ -107,12 +106,10 @@ def element(func):
         selector['class_name'] = mapping[func.__name__].get("class_name", None)
         selector['link_text'] = mapping[func.__name__].get("link_text", None)
         selector['timeout'] = mapping[func.__name__].get("timeout", 10)
-        if hasattr(args[0], "element"):
-            parent = args[0].element
-        else:
-            parent = args[0].explorer
+        parent = args[0].element if hasattr(args[0], "element") else args[0].explorer
         obj = mapping[func.__name__]['type'](parent, **selector)
         return func(*args, ret=obj)
+
     return inner
 
 
@@ -131,11 +128,11 @@ class Element:
 
     def __init__(self, parent, **kwargs):
         self.parent = parent
-        self.xpath = kwargs.get("xpath", None)
-        self.id = kwargs.get("id", None)
-        self.class_ = kwargs.get("class_name", None)
-        self.css = kwargs.get("css_selector", None)
-        self.link_text = kwargs.get("link_text", None)
+        self.xpath = kwargs.get("xpath")
+        self.id = kwargs.get("id")
+        self.class_ = kwargs.get("class_name")
+        self.css = kwargs.get("css_selector")
+        self.link_text = kwargs.get("link_text")
         self.timeout = kwargs.get("timeout", 10)
         self.element = self._get_element()
 

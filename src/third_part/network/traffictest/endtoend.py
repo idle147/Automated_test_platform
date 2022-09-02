@@ -28,7 +28,7 @@ class Endpoint:
     def __init__(self, name, comm):
         self.name = name
         self.comm = comm
-        self.devices = list()
+        self.devices = []
 
 
 class TrafficTester(metaclass=ABCMeta):
