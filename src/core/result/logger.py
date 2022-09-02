@@ -62,14 +62,14 @@ class LoggerManager:
 
         # 基本参数设置
         file_size_limit = kwargs.get("size_limit", 1024 * 1024)  # 单个文件大小，默认一个文件大小为1M
-        max_files = kwargs.get("max_files", None)  # 最大文件数
+        max_files = kwargs.get("max_files")
         file_mode = kwargs.get("mode", "w")  # 日志产生模式, 追加还是新建
 
         # 当我们注册一个新的测试用例的日志输出时, 所有相关的其他模块的日志都会向测试用例目录输出测试用例执行期间所产生的日志
         for_test = kwargs.get("for_test", False)  # 日志对测试用例开放
         is_test = kwargs.get("is_test", False)  # 日志是测试用例日志
 
-        log_format = kwargs.get("format", None)  # 日志条目的输出格式
+        log_format = kwargs.get("format")
         zip_logger = kwargs.get("zip", False)  # 是否压缩日志标识符
         if log_format is None:
             log_format = "[%(asctime)s][%(name)s]-<thread:%(thread)s>-(line:%(lineno)s), [%(levelname)s]: %(message)s"

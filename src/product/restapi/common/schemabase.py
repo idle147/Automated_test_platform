@@ -25,10 +25,13 @@ class SchemaBase:
             self.from_dict(raw_json)
 
     def to_dict(self):
-        rv = dict()
-        for key in self.__class__.__dict__:
-            if key in self.__class__.__dict__ and isinstance(self.__class__.__dict__[key], property):
-                rv[key] = self._value_to_dict(getattr(self, key))
+        rv = {
+            key: self._value_to_dict(getattr(self, key))
+            for key in self.__class__.__dict__
+            if key in self.__class__.__dict__
+            and isinstance(self.__class__.__dict__[key], property)
+        }
+
         self.raw_json = rv
         return rv
 
@@ -45,31 +48,31 @@ class SchemaBase:
         if _is_allow_type(dict_value):
             return dict_value
         if _is_list_type(dict_value):
-            rv = list()
-            for item in dict_value:
-                rv.append(self._dict_to_value(key, item))
+            rv = [self._dict_to_value(key, item) for item in dict_value]
             return rv
 
     def _value_to_dict(self, value):
         if _is_allow_type(value):
             return value
         if _is_list_type(value):
-            rv = list()
-            for item in value:
-                rv.append(self._value_to_dict(item))
-            return rv
+            return [self._value_to_dict(item) for item in value]
         if isinstance(value, SchemaBase):
             return value.to_dict()
 
     def __eq__(self, other):
-        if not (other.__class__.__name__ == self.__class__.__name__ and \
-                other.__class__.__module__ == self.__class__.__module__):
-            return False
-        for key in self.__class__.__dict__:
-            if key in self.__class__.__dict__ and isinstance(self.__class__.__dict__[key], property):
-                if getattr(self, key) != getattr(other, key):
-                    return False
-        return True
+        return (
+            not any(
+                key in self.__class__.__dict__
+                and isinstance(self.__class__.__dict__[key], property)
+                and getattr(self, key) != getattr(other, key)
+                for key in self.__class__.__dict__
+            )
+            if (
+                other.__class__.__name__ == self.__class__.__name__
+                and other.__class__.__module__ == self.__class__.__module__
+            )
+            else False
+        )
 
 
 def response_schema(code, schema):
@@ -92,7 +95,7 @@ def response_schema(code, schema):
 
     def outer(func):
         if not hasattr(func, "responses"):
-            setattr(func, "responses", dict())
+            setattr(func, "responses", {})
         if code not in func.responses:
             func.responses[code] = schema
 
@@ -122,10 +125,12 @@ class GraphqlType:
         for field, value in self.__dict__.items():
             if field.startswith("_field_") and value is not None:
                 rv += _get_indent(indent+1) + value.name + " "
-                arg_list = list()
-                for arg, arg_val in self.__dict__.items():
-                    if arg.startswith("_arg_") and arg_val is not None:
-                        arg_list.append(arg_val.to_string())
+                arg_list = [
+                    arg_val.to_string()
+                    for arg, arg_val in self.__dict__.items()
+                    if arg.startswith("_arg_") and arg_val is not None
+                ]
+
                 if any(arg_list):
                     rv += "(" + ", ".join(arg_list) + ") "
                 if not isinstance(value, SimpleTypeField):
@@ -135,25 +140,20 @@ class GraphqlType:
         return rv
 
     def to_json(self):
-        rv = dict()
+        rv = {}
         for field, value in self.__dict__.items():
             if field.startswith("_field_") and value is not None:
                 field_mock_value = None
                 if isinstance(value, SimpleTypeField):
-                    if value.type_ == "String":
-                        field_mock_value = ""
+                    if value.type_ == "Bool":
+                        field_mock_value  = True
                     elif value.type_ == "Int":
                         field_mock_value  = 0
-                    elif value.type_ == "Bool":
-                        field_mock_value  = True
                     else:
                         field_mock_value  = ""
                 else:
                     field_mock_value = value.to_json()
-                if value.is_array:
-                    rv[value.name] = [field_mock_value]
-                else:
-                    rv[value.name] = field_mock_value
+                rv[value.name] = [field_mock_value] if value.is_array else field_mock_value
         return rv
 
 
@@ -216,7 +216,7 @@ class ProductInfo(SchemaBase):
     required_fields = ["product_id", "product_name", "price", "status"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
+        self._object_fields = {}
         self._product_id = None
         self._product_name = None
         self._price = None

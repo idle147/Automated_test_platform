@@ -34,7 +34,7 @@ def case(priority=0, test_type=TestType.ALL, feature_name=None,
         setattr(cls, "test_type", test_type)  # 测试用例的类型
         setattr(cls, "feature_name", feature_name)  # 测试用例测试的功能
         setattr(cls, "testcase_id", testcase_id)  # 测试用例对应的测试用例ID
-        setattr(cls, "pre_tests", pre_tests if pre_tests else [])  # 前置的测试用例列表
+        setattr(cls, "pre_tests", pre_tests or [])
         setattr(cls, "skip_if_high_priority_failed", skip_if_high_priority_failed)  # 当高优先级失败时,不执行该测试用例
         return cls
 
@@ -87,7 +87,7 @@ def data_provider(filename=None, stop_on_error=False):
             case_file = inspect.getfile(test_case.__class__)
             if filename:
                 case_file = filename
-            test_data_file = case_file + ".json"
+            test_data_file = f"{case_file}.json"
             if not os.path.exists(test_data_file):
                 raise TestDataFileNotFound(f"Cannot found code_test data for case {test_case.__class__.__name__}")
 

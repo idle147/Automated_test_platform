@@ -45,32 +45,28 @@ def load_cases(package, case_tree):
     # 如果是一个目录,则包含__init__.py文件
     if os.path.basename(module.__spec__.origin) == "__init__.py":
         case_tree["sub_module"] = []
-        case_tree["cases"] = list()
+        case_tree["cases"] = []
         module_path = os.path.dirname(module.__spec__.origin)
         for file in os.listdir(module_path):
             if file == "__pycache__":
                 continue
             if os.path.isdir(os.path.join(module_path, file)):
                 # 如果是一个子文件夹，则代表可能是一个子包，递归查找
-                sub_module = dict()
-                sub_module["module"] = package + "." + file
+                sub_module = {"module": f"{package}.{file}"}
                 case_tree["sub_module"].append(sub_module)
-                load_cases(package + "." + file, sub_module)
-            else:
-                # 如果是一个py文件，则动态引用，并且查找是否有父类为TestCaseBase的类
-                if os.path.splitext(file)[1] == ".py":
-                    case_module_name = package + "." + os.path.splitext(file)[0]
-                    try:
-                        # 测试用例如果有语法错误会导致导入异常，需要catch
-                        case_module = import_module(case_module_name)
-                    except:
-                        continue
-                    for k, v in case_module.__dict__.items():
-                        if hasattr(v, "__base__") and v.__base__.__name__ == "TestCaseBase":
-                            case_info = dict()
-                            case_info['name'] = f"{case_module_name}.{v.__name__}"
-                            get_case_info(v, case_info)
-                            case_tree["cases"].append(case_info)
+                load_cases(f"{package}.{file}", sub_module)
+            elif os.path.splitext(file)[1] == ".py":
+                case_module_name = f"{package}.{os.path.splitext(file)[0]}"
+                try:
+                    # 测试用例如果有语法错误会导致导入异常，需要catch
+                    case_module = import_module(case_module_name)
+                except:
+                    continue
+                for k, v in case_module.__dict__.items():
+                    if hasattr(v, "__base__") and v.__base__.__name__ == "TestCaseBase":
+                        case_info = {'name': f"{case_module_name}.{v.__name__}"}
+                        get_case_info(v, case_info)
+                        case_tree["cases"].append(case_info)
 
 
 def get_case_info(case, case_info):
@@ -110,8 +106,7 @@ def load_case_ast(path, case_tree, base_path):
         if file == "__pycache__":
             continue
         if os.path.isdir(os.path.join(path, file)):
-            sub_module = dict()
-            sub_module["name"] = path.replace("/", ".").replace("\\", ".") + "." + file
+            sub_module = {"name": path.replace("/", ".").replace("\\", ".") + "." + file}
             sub_module["name"] = sub_module["name"][len(base_path):]
             case_tree["sub_modules"].append(sub_module)
             load_case_ast(os.path.join(path, file), sub_module, base_path)
@@ -126,8 +121,7 @@ def load_case_ast(path, case_tree, base_path):
                     if isinstance(ast_obj, ast.ClassDef) and hasattr(ast_obj, "bases"):
                         for base_cls in ast_obj.bases:
                             if base_cls.id == "TestCaseBase":
-                                case_info = dict()
-                                case_info["name"] = case_moudule_name + "." + ast_obj.name
+                                case_info = {"name": f"{case_moudule_name}.{ast_obj.name}"}
                                 get_ast_case_info(ast_obj, case_info)
                                 case_tree['cases'].append(case_info)
 
@@ -150,8 +144,7 @@ def get_ast_case_info(case, case_info):
 
 
 if __name__ == '__main__':
-    cases = dict()
-    cases["module"] = "product.testcase"
+    cases = {"module": "product.testcase"}
     load_case_ast("/Users/lilen/PycharmProjects/autoframework/product/testcase",
                   cases, "/Users/lilen/PycharmProjects/autoframework/")
     print(json.dumps(cases, indent=2))

@@ -52,7 +52,7 @@ class SettingBase(metaclass=ABCMeta):
         当配置文件的文件名为空时,生成一个文件名,否则按默认路径(_DEFAULT_PATH)生成
         @return:
         """
-        filename = cls.file_name if cls.file_name else cls.__name__ + ".settings"
+        filename = cls.file_name or f"{cls.__name__}.settings"
         return os.path.join(cls.setting_path, filename)
 
     @classmethod
@@ -67,13 +67,14 @@ class SettingBase(metaclass=ABCMeta):
 
         # 序列化操作
         with open(cls._get_full_path(), "w") as file:
-            obj = {}
-            for key, value in cls.__dict__.items():
-                # 过滤掉诸如__module__等以"_"开头的信息，setting_path字段，file_name字段
-                # TODO: 此处可进行其他非法字符串的过滤操作
-                if key.startswith("_") or key == "setting_path" or key == "file_name":
-                    continue
-                obj[key] = value
+            obj = {
+                key: value
+                for key, value in cls.__dict__.items()
+                if not key.startswith("_")
+                and key != "setting_path"
+                and key != "file_name"
+            }
+
             json.dump(obj, file, indent=4)
 
     @classmethod
@@ -134,10 +135,11 @@ class StaticSettingManager:
         @param setting_class:
         @return:
         """
-        if hasattr(setting_class, "__base__"):
-            if setting_class.__base__.__name__ != "SettingBase":
-                raise SettingError("注册的配置必须是SettingBase的子类")
-        else:
+        if (
+            hasattr(setting_class, "__base__")
+            and setting_class.__base__.__name__ != "SettingBase"
+            or not hasattr(setting_class, "__base__")
+        ):
             raise SettingError("注册的配置必须是SettingBase的子类")
         # 将该类添加到字典当中, 同时使用当前的setting_path来设置类的setting_path
         self.settings[setting_name] = setting_class

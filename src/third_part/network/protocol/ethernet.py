@@ -39,7 +39,7 @@ class Ethernet:
     def parse(self, value):
         if isinstance(value, str):
             value = bytes.fromhex(value)
-        self.da = MacAddress(value[0:6])
+        self.da = MacAddress(value[:6])
         self.sa = MacAddress(value[6:12])
         self.protocol = value[12:14]
         self.payload = value[14: -4]
@@ -47,7 +47,7 @@ class Ethernet:
 
     def to_bytes(self):
         ret = b''
-        ret = ret + self.da.to_bytes()
+        ret += self.da.to_bytes()
         ret = ret + self.sa.to_bytes()
         ret = ret + self.protocol
         ret = ret + self.payload
@@ -80,7 +80,7 @@ class TlvType(SerializableObject):
         super().__init__(value)
 
     def parse(self, value):
-        self.type = int.from_bytes(value[0:2], byteorder='big')
+        self.type = int.from_bytes(value[:2], byteorder='big')
         self.length = int.from_bytes(value[2:4], byteorder='big')
 
     def to_bytes(self):

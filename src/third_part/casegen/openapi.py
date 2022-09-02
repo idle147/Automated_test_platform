@@ -10,7 +10,7 @@ def change_to_camel(name):
     :return:
     """
     name_list = name.split("_")
-    rv = list()
+    rv = []
     for n in name_list:
         if n == "":
             continue
@@ -31,10 +31,10 @@ def get_internal_response_schema_name(url, method, code):
     """
     schema_name = ""
     if url:
-        schema_name += format_url_to_snake(url) + "_"
+        schema_name += f"{format_url_to_snake(url)}_"
     if method:
         schema_name += schema_name + method + "_"
-    schema_name += "response_" + code
+    schema_name += f"response_{code}"
     schema_name = change_to_camel(schema_name)
     return schema_name
 
@@ -44,7 +44,7 @@ def get_internal_request_schema_name(url, method):
      生成假的 schema_name 用以解决内联schema_name没有相应的名称问题
      """
     schema_name = format_url_to_snake(url)
-    schema_name += "_" + method + "_request"
+    schema_name += f"_{method}_request"
     schema_name = change_to_camel(schema_name)
     return schema_name
 
@@ -75,23 +75,21 @@ class SchemaDataType:
     def __init__(self, *args, **kwargs):
         self.item = None
         self.name = None
-        self.data_type = kwargs.get("type_", None)
-        self.type_object = kwargs.get("obj", None)
+        self.data_type = kwargs.get("type_")
+        self.type_object = kwargs.get("obj")
         self.description = self.type_object.get("description", "")
 
     @staticmethod
     def create(type_data):
         if type_data == "":
             return OtherSchemaDataType(type_="other", obj={})
-        ref = type_data.get("$ref", None)
-        if ref:
+        if ref := type_data.get("$ref", None):
             return ReferenceSchemaDataType(type_="ref", obj=type_data)
+        type_str = type_data.get("type", "object")
+        if type_str in SchemaDataType.type_mapping():
+            return SchemaDataType.type_mapping()[type_str](type_=type_str, obj=type_data)
         else:
-            type_str = type_data.get("type", "object")
-            if type_str in SchemaDataType.type_mapping():
-                return SchemaDataType.type_mapping()[type_str](type_=type_str, obj=type_data)
-            else:
-                raise OpenApiDefineError(f"{type_str} is not a open API data type")
+            raise OpenApiDefineError(f"{type_str} is not a open API data type")
 
 
 class StringSchemaDataType(SchemaDataType):
@@ -106,7 +104,7 @@ class StringSchemaDataType(SchemaDataType):
 
     @property
     def enum_list(self):
-        return self.type_object.get("enum", list())
+        return self.type_object.get("enum", [])
 
 
 class IntSchemaDataType(SchemaDataType):
@@ -133,9 +131,9 @@ class ObjectSchemaDataType(SchemaDataType):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.required = self.type_object.get("required", list())
-        self.properties = dict()
-        for pname, pdata in self.type_object.get("properties", dict()).items():
+        self.required = self.type_object.get("required", [])
+        self.properties = {}
+        for pname, pdata in self.type_object.get("properties", {}).items():
             self.properties[pname] = SchemaDataType.create(pdata)
 
 
@@ -165,7 +163,7 @@ class Schemas:
     """
 
     def __init__(self, objects, parent):
-        self.schema_mapping = dict()
+        self.schema_mapping = {}
         self.parent = parent
         self.parse(objects)
 
@@ -194,7 +192,7 @@ class Response:
 
 class Responses:
     def __init__(self, objects, parent):
-        self.response_mapping = dict()
+        self.response_mapping = {}
         self.parent = parent
         for response_key, response_value in objects.items():
             self.response_mapping[f"/components/responses/{response_key}"] = Response(response_key, response_value)
@@ -219,7 +217,7 @@ class Parameter:
 
 class Parameters:
     def __init__(self, objects, parent):
-        self.parameter_mapping = dict()
+        self.parameter_mapping = {}
         self.parent = parent
         for pkey, pvalue in objects.items():
             self.parameter_mapping[f"/components/parameters/{pkey}"] = Parameter(pvalue)
@@ -237,7 +235,7 @@ class RequestBody:
 
 class RequestBodies:
     def __init__(self, objects, parent):
-        self.body_mapping = dict()
+        self.body_mapping = {}
         self.parent = parent
         for key, value in objects.items():
             self.body_mapping[f"/components/requestBodies/{key}"] = RequestBody(value)
@@ -253,12 +251,12 @@ class ApiMethod:
         self.method = method
         self.summary = method_data.get("summary", "")
         self.description = method_data.get("description", "")
-        self.tags = method_data.get("tags", list())
-        self.parameters = list()
+        self.tags = method_data.get("tags", [])
         self.request_body = None
-        self.responses = dict()
-        for param in method_data.get("parameters", list()):
-            self.parameters.append(Parameter(param))
+        self.responses = {}
+        self.parameters = [
+            Parameter(param) for param in method_data.get("parameters", [])
+        ]
 
         if "requestBody" in method_data:
             self.request_body = RequestBody(method_data["requestBody"])
@@ -270,10 +268,11 @@ class ApiObject:
     def __init__(self, url, api_data):
         self.url = url
         self.api_data = api_data
-        self.parameters = list()
-        self.methods = list()
-        for param in api_data.get("parameters", list()):
-            self.parameters.append(Parameter(param))
+        self.methods = []
+        self.parameters = [
+            Parameter(param) for param in api_data.get("parameters", [])
+        ]
+
         methods = ['get', 'post', 'put', 'patch', 'delete']
         for method in methods:
             if method in api_data:
@@ -287,14 +286,14 @@ class SwaggerLoader:
 
     def __init__(self, **kwargs):
         self.main_file = None
-        self.yaml_file = dict()
-        self.api_list = dict()
-        self.schema_data = dict()
-        self.response_data = dict()
-        self.parameter_data = dict()
-        self.description_data = dict()
-        self.request_bodies = dict()
-        self.replace_mapping = kwargs.get("replace_mapping", dict())
+        self.yaml_file = {}
+        self.api_list = {}
+        self.schema_data = {}
+        self.response_data = {}
+        self.parameter_data = {}
+        self.description_data = {}
+        self.request_bodies = {}
+        self.replace_mapping = kwargs.get("replace_mapping", {})
 
     def load(self, files, main_file=None):
         if main_file is None or main_file not in files:
@@ -307,22 +306,22 @@ class SwaggerLoader:
                 file_name = os.path.basename(file)
                 swagger_data = yaml.load(f)
                 self.yaml_file[file_name] = swagger_data
-                self.description_data[file_name] = dict()
+                self.description_data[file_name] = {}
                 self.description_data[file_name]['info'] = swagger_data['info']
                 self.description_data[file_name]['servers'] = swagger_data.get("servers", None)
 
                 if "schemas" in swagger_data["components"]:
                     self.schema_data[file_name] = \
-                        Schemas(swagger_data["components"]["schemas"], self)
+                            Schemas(swagger_data["components"]["schemas"], self)
                 if "responses" in swagger_data["components"]:
                     self.response_data[file_name] = \
-                        Responses(swagger_data["components"]["responses"], self)
+                            Responses(swagger_data["components"]["responses"], self)
                 if "parameters" in swagger_data["components"]:
                     self.parameter_data[file_name] = \
-                        Parameters(swagger_data["components"]["parameters"], self)
+                            Parameters(swagger_data["components"]["parameters"], self)
                 if "requestBodies" in swagger_data["components"]:
                     self.request_bodies[file_name] = \
-                        RequestBodies(swagger_data["components"]["requestBodies"], self)
+                            RequestBodies(swagger_data["components"]["requestBodies"], self)
                 if "paths" in swagger_data:
                     # 创建ApiObject对象
                     for url, api_data in swagger_data['paths'].items():
@@ -332,42 +331,42 @@ class SwaggerLoader:
                         for method in apiobj.methods:
                             for code, response in method.responses.items():
                                 if response.content is not None and \
-                                        isinstance(response.content, ObjectSchemaDataType):
+                                            isinstance(response.content, ObjectSchemaDataType):
                                     # 创建内联Schema
                                     schema_name = get_internal_response_schema_name(url, method.method, code)
                                     self.schema_data[file_name].schema_mapping[f"/components/schemas/{schema_name}"] = \
-                                        response.content
+                                            response.content
                                     self.schema_data[file_name].schema_mapping[
                                         f"/components/schemas/{schema_name}"].name = \
-                                        schema_name
+                                            schema_name
                             if method.request_body is not None and \
-                                    method.request_body.ref is None and \
-                                    isinstance(method.request_body.content, ObjectSchemaDataType):
+                                        method.request_body.ref is None and \
+                                        isinstance(method.request_body.content, ObjectSchemaDataType):
                                 # 创建内联Schema
                                 schema_name = get_internal_request_schema_name(url, method.method)
                                 self.schema_data[file_name].schema_mapping[f"/components/schemas/{schema_name}"] = \
-                                    method.request_body.content
+                                        method.request_body.content
                                 self.schema_data[file_name].schema_mapping[f"/components/schemas/{schema_name}"].name = \
-                                    schema_name
+                                        schema_name
                 # 遍历Responses中所有的内联Schema定义，创建内联Schema
                 for yfile, responses in self.response_data.items():
                     for code, response in responses.response_mapping.items():
                         if response.content and isinstance(response.content, ObjectSchemaDataType):
                             schema_name = get_internal_response_schema_name(None, None, str(response.status_code))
                             self.schema_data[yfile].schema_mapping[f"/components/schemas/{schema_name}"] = \
-                                response.content
+                                    response.content
                             self.schema_data[yfile].schema_mapping[f"/components/schemas/{schema_name}"].name = \
-                                schema_name
+                                    schema_name
 
         # yfile is the filename, t is the URL name
         # in outbound reference, the reference should be https://xxxx.xxx#/components/schema
         # so we need to put the file name as the HTTP url
         for yfile, target_url in self.replace_mapping.items():
             if yfile in self.schema_data:
-                self.schema_data[target_url] = self.schema_data.get(yfile, dict())
-                self.response_data[target_url] = self.response_data.get(yfile, dict())
-                self.parameter_data[target_url] = self.parameter_data.get(yfile, dict())
-                self.request_bodies[target_url] = self.request_bodies.get(yfile, dict())
+                self.schema_data[target_url] = self.schema_data.get(yfile, {})
+                self.response_data[target_url] = self.response_data.get(yfile, {})
+                self.parameter_data[target_url] = self.parameter_data.get(yfile, {})
+                self.request_bodies[target_url] = self.request_bodies.get(yfile, {})
                 if yfile in self.schema_data:
                     self.schema_data.pop(yfile)
                 if yfile in self.response_data:
@@ -408,10 +407,11 @@ class SwaggerLoader:
         if schema.data_type == "number":
             return 0.1
         if schema.data_type == "object":
-            rv = dict()
-            for name, field in schema.properties.items():
-                rv[name] = self.get_struct_from_schema(field)
-            return rv
+            return {
+                name: self.get_struct_from_schema(field)
+                for name, field in schema.properties.items()
+            }
+
 
         return {}
 
@@ -422,10 +422,13 @@ class SwaggerLoader:
                 ref_str = response.content.ref.split("#")
                 response_file = recent_file if ref_str[0] == "" else ref_str[0]
                 if ref_str[1] in self.response_data[response_file].response_mapping:
-                    # reference is a response
-                    obj = self.get_response_schema(
-                        self.response_data[response_file].response_mapping[ref_str[1]], response_file)
-                    return obj
+                    return self.get_response_schema(
+                        self.response_data[response_file].response_mapping[
+                            ref_str[1]
+                        ],
+                        response_file,
+                    )
+
                 elif ref_str[1] in self.schema_data[response_file].schema_mapping:
                     return self.get_final_schema(self.schema_data[response_file].schema_mapping[ref_str[1]])
             elif isinstance(response.content, ObjectSchemaDataType):
@@ -444,22 +447,20 @@ class SwaggerLoader:
         This method walks thru the request body and get the
         corresponding schema object
         """
-        if method.request_body is not None:
-            if hasattr(method.request_body, "ref") and method.request_body.ref:
-                ref_str = method.request_body.ref.split("#")
-                file = ref_str[0] if ref_str[0] != "" else self.main_file
-                req_body = self.request_bodies[file][ref_str[1]]
-            else:
-                req_body = method.request_body
-            if isinstance(req_body.content, ObjectSchemaDataType):
-                request_schema = get_internal_request_schema_name(url, method.method)
-                request_obj = \
-                    self.schema_data[self.main_file].schema_mapping[
-                        f"/components/schemas/{request_schema}"]
-            else:
-                request_obj = self.get_final_schema(req_body.content)
-            return request_obj
-        return None
+        if method.request_body is None:
+            return None
+        if hasattr(method.request_body, "ref") and method.request_body.ref:
+            ref_str = method.request_body.ref.split("#")
+            file = ref_str[0] if ref_str[0] != "" else self.main_file
+            req_body = self.request_bodies[file][ref_str[1]]
+        else:
+            req_body = method.request_body
+        if not isinstance(req_body.content, ObjectSchemaDataType):
+            return self.get_final_schema(req_body.content)
+        request_schema = get_internal_request_schema_name(url, method.method)
+        return self.schema_data[self.main_file].schema_mapping[
+            f"/components/schemas/{request_schema}"
+        ]
 
     def get_response_schema_obj(self, url, method, response, code):
         """
@@ -469,8 +470,9 @@ class SwaggerLoader:
         """
         if response.content is not None and isinstance(response.content, ObjectSchemaDataType):
             schema_name = get_internal_response_schema_name(url, method.method, code)
-            response_obj = \
-                self.schema_data[self.main_file].schema_mapping[f"/components/schemas/{schema_name}"]
+            return self.schema_data[self.main_file].schema_mapping[
+                f"/components/schemas/{schema_name}"
+            ]
+
         else:
-            response_obj = self.get_response_schema(response)
-        return response_obj
+            return self.get_response_schema(response)

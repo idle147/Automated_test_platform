@@ -32,18 +32,20 @@ class ProductApi:
         self.header = [{"Content-Type": "application/json"}]
 
     def product_get(self):
-        return requests.post(self.url + f"/product", header=self.header)
+        return requests.post(f"{self.url}/product", header=self.header)
 
     def product_post(self, product):
-        return requests.post(self.url + f"/product", json=product, header=self.header)
+        return requests.post(f"{self.url}/product", json=product, header=self.header)
 
     def product_id_post(self, id):
-        return requests.get(self.url+ f"/product/{id}", header=self.header)
+        return requests.get(f"{self.url}/product/{id}", header=self.header)
 
     def product_id_put(self, id, product):
-        return requests.put(self.url + f"/product/{id}", json=product, header=self.header)
+        return requests.put(
+            f"{self.url}/product/{id}", json=product, header=self.header
+        )
 
     def product_id_delete(self, id):
-        return requests.delete(self.url + f"/product/{id}", header=self.header)
+        return requests.delete(f"{self.url}/product/{id}", header=self.header)
 
 

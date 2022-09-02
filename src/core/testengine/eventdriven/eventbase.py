@@ -29,7 +29,7 @@ class EventBase(metaclass=ABCMeta):
 
     def __init__(self, description="", **kwargs):
         self.description = description
-        self.arguments = dict()
+        self.arguments = {}
         self.job = None
         self.interval = kwargs.get("interval", 0)
         self.result = EventStatus.IDlE

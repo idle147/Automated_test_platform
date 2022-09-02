@@ -63,7 +63,7 @@ class ModuleManager:
     配置模块的管理
     """
     def __init__(self):
-        self.modules = dict()
+        self.modules = {}
 
     def load(self):
         """
@@ -114,7 +114,7 @@ class ModuleManager:
         """
         获取模块的实例化列表
         """
-        rv = list()
+        rv = []
         for mkey, mvalue in self.modules.items():
             print(mvalue['class'].module_type)
             print(module_type)
@@ -126,8 +126,7 @@ class ModuleManager:
         """
         保存所有模块到模块配置列表
         """
-        obj = dict()
-        obj['modules'] = list()
+        obj = {'modules': []}
         for mkey, mvalue in self.modules.items():
             obj['modules'].append({
                 "name": mkey,

@@ -21,20 +21,21 @@ class SshClient(CommandLine):
         self.session = None
 
     def connect(self):
-        if self.ssh is None:
-            try:
-                self.ssh = paramiko.SSHClient()
-                self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                self.ssh.connect(self.host, self.port, self.username, self.password)
-                trans = self.ssh.get_transport()
-                self.session = trans.open_session()
-                self.session.get_pty()
-                self.session.invoke_shell()
-                if not self._login():
-                    self.disconnect()
-            except Exception as ex:
-                self.ssh = None
-                self.session = None
+        if self.ssh is not None:
+            return
+        try:
+            self.ssh = paramiko.SSHClient()
+            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.ssh.connect(self.host, self.port, self.username, self.password)
+            trans = self.ssh.get_transport()
+            self.session = trans.open_session()
+            self.session.get_pty()
+            self.session.invoke_shell()
+            if not self._login():
+                self.disconnect()
+        except Exception as ex:
+            self.ssh = None
+            self.session = None
 
     def disconnect(self):
         if self.ssh:

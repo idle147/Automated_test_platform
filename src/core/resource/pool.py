@@ -45,9 +45,7 @@ def register_resource(category, resource_type, comm_callback):
     @param comm_callback: 具体的实例化方法
     @return:
     """
-    if category == "device":
-        _resource_port_mapping[resource_type] = comm_callback
-    elif category == "port":
+    if category in ["device", "port"]:
         _resource_port_mapping[resource_type] = comm_callback
 
 
@@ -60,8 +58,8 @@ class DevicePort:
     def __init__(self, parent_device=None, name="", *args, **kwargs):
         self.parent = parent_device
         self.name = name
-        self.type = kwargs.get("type", None)
-        self.description = kwargs.get("description", None)
+        self.type = kwargs.get("type")
+        self.description = kwargs.get("description")
         self.remote_ports = []
         self._instance = None
 
@@ -91,16 +89,11 @@ class DevicePort:
             if key == "parent":
                 ret[key] = value.name
             elif key == "remote_ports":
-                ret[key] = []
-                for remote_port in value:
-                    # 使用device的名称和port的名称来表示远端的端口
-                    # 在反序列化的时候可以方便地找到相应的对象实例
-                    ret[key].append(
-                        {
-                            "device": remote_port.parent.name,
-                            "port": remote_port.name
-                        }
-                    )
+                ret[key] = [
+                    {"device": remote_port.parent.name, "port": remote_port.name}
+                    for remote_port in value
+                ]
+
             else:
                 ret[key] = value
         return ret
@@ -117,7 +110,7 @@ class DevicePort:
         ret = DevicePort(parent)
         # 除remote_ports和parent外,将字典中所有的key设置成该实例的属性
         for key, value in dict_obj.items():
-            if key == "remote_ports" or key == "parent":
+            if key in ["remote_ports", "parent"]:
                 continue
             setattr(ret, key, value)  # 设置属性值
         return ret
@@ -132,8 +125,8 @@ class ResourceDevice:
 
     def __init__(self, name="", *args, **kwargs):
         self.name = name
-        self.type = kwargs.get("type", None)
-        self.description = kwargs.get("description", None)
+        self.type = kwargs.get("type")
+        self.description = kwargs.get("description")
         self.pre_connect = False
         self.ports = {}
         self._instance = None
@@ -185,12 +178,12 @@ class ResourceDevice:
         ret = ResourceDevice()
         for key, value in dict_obj.items():
             if key == "ports":
-                ports = dict()
-                for port_name, port in value.items():
-                    ports[port_name] = DevicePort.from_dict(port, ret)
-                setattr(ret, key, value)
-            else:
-                setattr(ret, key, value)
+                ports = {
+                    port_name: DevicePort.from_dict(port, ret)
+                    for port_name, port in value.items()
+                }
+
+            setattr(ret, key, value)
         return ret
 
 
@@ -255,7 +248,7 @@ class ResourcePool:
         self.file_name = filename
         self.topology.clear()
         self.reserved = False
-        self.information = dict()
+        self.information = {}
 
         # 读取资源配置的JSON字符串
         with open(filename) as file:
@@ -263,8 +256,8 @@ class ResourcePool:
 
         # 判断是否被占用(不是当前的所有者)
         if "reserved" in json_object and \
-                json_object['reserved'] is not None and \
-                json_object['reserved']['owner'] != owner:
+                    json_object['reserved'] is not None and \
+                    json_object['reserved']['owner'] != owner:
             raise ResourceError(f"源文件已经被[ {json_object['reserved']['owner']} ]占用")
 
         self.owner = owner
@@ -284,9 +277,7 @@ class ResourcePool:
 
     def save(self, filename):
         with open(filename, mode="w") as file:
-            root_object = dict()
-            root_object['device'] = dict()
-            root_object['info'] = self.information
+            root_object = {'device': {}, 'info': self.information}
             for device_key, device in self.topology.items():
                 root_object['device'][device_key] = device.to_dict()
             json.dump(root_object, file, indent=4)
@@ -312,8 +303,7 @@ class ResourcePool:
                     ret.append(value)
             if len(ret) > count:
                 return ret
-        else:  # 如果条件一直不满足，则执行该语句
-            return []
+        return []
 
     def collect_device_info(self, device_type, constraints=None):
         """
@@ -355,8 +345,7 @@ class ResourcePool:
             conns = constraint.get_connection(resource)
             if not any(conns):
                 raise ResourceNotMeetConstraint([constraint])
-            for conn in conns:
-                ret.append(conn)
+            ret.extend(iter(conns))
         return ret
 
 

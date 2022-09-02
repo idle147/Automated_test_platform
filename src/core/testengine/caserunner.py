@@ -113,7 +113,7 @@ class CaseRunner:
         self.logger.info("执行器装载完毕")
 
         self.case_log_folder = None
-        self.case_result = dict()
+        self.case_result = {}
 
     def load_resource(self, file_name, username):
         """
@@ -169,7 +169,7 @@ class CaseRunner:
         4. 遍历测试用例地子列表,递归调用_import_list_case方法,装载子列表地测试用例
         """
 
-        case_module_name = ".".join(test_name.split(".")[0: -1])
+        case_module_name = ".".join(test_name.split(".")[:-1])
         case_name = test_name.split(".")[-1]
         # 动态引用测试用例
         try:
@@ -177,7 +177,7 @@ class CaseRunner:
             return getattr(case_module, case_name)(self.result_report)
         except Exception as ex:
             # 导入测试用例失败，抛出异常
-            raise CaseImportError("导入测试用例 [%s] [失败]!" % test_name, ex)
+            raise CaseImportError(f"导入测试用例 [{test_name}] [失败]!", ex)
 
     def set_test_list(self, test_list: TestList):
         """
@@ -253,7 +253,7 @@ class CaseRunner:
 
         # 构建测试列表和测试用例的信息
         case_tree_node["list_name"] = test_list.test_list_name
-        case_tree_node["test_cases"] = list()
+        case_tree_node["test_cases"] = []
         case_tree_node['sub_list'] = []
 
         # 遍历测试列表中的测试用例, 并加入测试用例树
@@ -275,10 +275,11 @@ class CaseRunner:
                 case_descriptor['log_path'] = case_log_path
                 case_descriptor['setting_file'] = case_setting_file
                 # 设置测试用例配置文件路径
-                if test_list.setting.case_setting_path:
-                    case_descriptor['setting_path'] = test_list.setting.case_setting_path
-                else:
-                    case_descriptor['setting_path'] = CaseRunnerSetting.default_case_setting_path
+                case_descriptor['setting_path'] = (
+                    test_list.setting.case_setting_path
+                    or CaseRunnerSetting.default_case_setting_path
+                )
+
                 # 设置当前测试用例的优先级,并加入优先级清单中, 默认设置为 999(最高)
                 case_priority = getattr(case_descriptor['case'], "priority", 999)
                 if case_priority not in self.priority_list:

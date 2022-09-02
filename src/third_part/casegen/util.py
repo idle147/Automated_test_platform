@@ -1,9 +1,9 @@
 
 
 def get_parameters(api_obj, method):
-    path_param = list()
-    query_param = list()
-    query_param_option = list()
+    path_param = []
+    query_param = []
+    query_param_option = []
     for param in api_obj.parameters:
         if param.in_ == "path":
             path_param.append(param.name)

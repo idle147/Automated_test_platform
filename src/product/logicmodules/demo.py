@@ -16,7 +16,7 @@ class DemoModule(ModuleBase):
     def __init__(self, report: ResultReporter, resource: ResourcePool, **kwargs):
         super().__init__(report, resource)
         self.setting_path = kwargs.get("setting_path", ".")
-        self.setting_file = kwargs.get("setting_file", None)
+        self.setting_file = kwargs.get("setting_file")
 
     def action(self):
         self.reporter.add(StepResult.INFO, "This is a demo module")

@@ -31,7 +31,7 @@ class ObjectCreator:
 
     def __init__(self, swagger: SwaggerLoader):
         self.swagger = swagger
-        self.code_statements = list()  # 用来保存生成的Code DOM语句
+        self.code_statements = []
 
     def generate(self):
         """

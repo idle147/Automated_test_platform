@@ -36,7 +36,7 @@ class NodeEntry:
         self.headline = headline
         self.message = message
         self.parent = parent
-        self.children = list()
+        self.children = []
         self.timestamp = time.localtime()
         self.update_action = update_action
 
@@ -56,11 +56,13 @@ class NodeEntry:
         return ret
 
     def get_json(self):
-        json_obj = dict()
-        json_obj["headline"] = self.headline
-        json_obj["message"] = self.message
-        json_obj['timestamp'] = time.strftime(TIME_FORMAT, self.timestamp)
-        json_obj["children"] = list()
+        json_obj = {
+            "headline": self.headline,
+            "message": self.message,
+            'timestamp': time.strftime(TIME_FORMAT, self.timestamp),
+            "children": [],
+        }
+
         for child in self.children:
             json_obj["children"].append(child.get_json())
         return json_obj
@@ -73,7 +75,7 @@ class NodeEntry:
         return ret
 
     def __str__(self):
-        return self.headline + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]" + os.linesep
+        return f"{self.headline}[{time.strftime(TIME_FORMAT, self.timestamp)}]{os.linesep}"
 
 
 class CaseEntry(NodeEntry):
@@ -103,16 +105,20 @@ class CaseEntry(NodeEntry):
         return True
 
     def __str__(self):
-        return self.headline + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]"
+        return f"{self.headline}[{time.strftime(TIME_FORMAT, self.timestamp)}]"
 
     def _get_result_headline(self, width, indent, headline_max=59):
         self.update_result()
         head_str = self.__str__()
         if len(head_str) > headline_max:
-            head_str = head_str[0: headline_max] + "..."
+            head_str = head_str[:headline_max] + "..."
         space_count = width - indent - len(head_str)
-        ret = (" " * indent) + head_str + ("-" * space_count) + self.result.value.upper()
-        return ret
+        return (
+            (" " * indent)
+            + head_str
+            + ("-" * space_count)
+            + self.result.value.upper()
+        )
 
     def start(self, headline, message, prefix=None):
         entry = CaseStepEntry(headline=headline, parent=self, message=message)
@@ -157,7 +163,7 @@ class CaseEntry(NodeEntry):
     def info(self, message):
         if self.update_action is not None:
             self.update_action()
-        self.message += "INFO: " + message + os.linesep
+        self.message += f"INFO: {message}{os.linesep}"
 
     def __init__(self, headline, parent=None, message=""):
         super().__init__(headline, parent, message)
@@ -227,28 +233,32 @@ class CaseStepEntry(CaseEntry):
             return True
         if exc_type is StepEnd:
             self.result = exc_val.result
-            if self.result == ResultType.PASS:
-                return True
-            else:
-                return self._continue
+            return True if self.result == ResultType.PASS else self._continue
         else:
             self.result = ResultType.ERROR
             self.message += str(exc_tb)
             return self._continue
 
     def __str__(self):
-        if self.step_prefix == "COLLECT_RESOURCE" or self.step_prefix == "SETUP" or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP":
-            headline = self.step_prefix + "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]"
+        if self.step_prefix in ["COLLECT_RESOURCE", "SETUP", "TEST", "CLEANUP"]:
+            headline = f"{self.step_prefix}[{time.strftime(TIME_FORMAT, self.timestamp)}]"
         else:
-            headline = "STEP-" + self.step_prefix + str(self.step_no) + ": " + self.headline + \
-                       "[" + time.strftime(TIME_FORMAT, self.timestamp) + "]"
+            headline = (
+                (
+                    f"STEP-{self.step_prefix}{str(self.step_no)}: {self.headline}"
+                    + "["
+                )
+                + time.strftime(TIME_FORMAT, self.timestamp)
+                + "]"
+            )
+
         return headline
 
     def start(self, headline, message, _continue=False, prefix=None):
         entry = CaseStepEntry(headline=headline, parent=self, message=message, _continue=_continue)
         if prefix is not None:
             entry.step_prefix = prefix
-        elif self.step_prefix == "SETUP" or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP" or self.step_prefix == "COLLECT_RESOURCE":
+        elif self.step_prefix in ["SETUP", "TEST", "CLEANUP", "COLLECT_RESOURCE"]:
             entry.step_prefix = ""
         else:
             entry.step_prefix = self.step_prefix + str(self.step_no) + "-"
@@ -263,10 +273,13 @@ class CaseStepEntry(CaseEntry):
 
     def get_json(self):
         json_obj = super().get_json()
-        if self.step_prefix == "SETUP" or self.step_prefix == "TEST" or self.step_prefix == "CLEANUP":
+        if self.step_prefix in ["SETUP", "TEST", "CLEANUP"]:
             json_obj['headline'] = self.step_prefix
         else:
-            json_obj['headline'] = "STEP-" + self.step_prefix + str(self.step_no) + self.headline
+            json_obj[
+                'headline'
+            ] = f"STEP-{self.step_prefix}{str(self.step_no)}{self.headline}"
+
         return json_obj
 
 
@@ -289,10 +302,7 @@ class StepReporter:
         cls.path = "/home/emc/"
         cls.json_path = os.path.join(cls.path, "step_result.json")
         cls.txt_path = os.path.join(cls.path, "step_result.txt")
-        if cls.instance is None:
-            return StepReporter(logger)
-        else:
-            return cls.instance
+        return StepReporter(logger) if cls.instance is None else cls.instance
 
     def __init__(self, logger):
         self.logger = logger

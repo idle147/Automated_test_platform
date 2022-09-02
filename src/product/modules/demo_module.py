@@ -23,7 +23,7 @@ class DemoModule(ModuleBase):
         super().__init__(report, resource)
         # 每个模块有自己的设置文件与路径
         self.setting_path = kwargs.get("setting_path", "")
-        self.setting_file = kwargs.get("setting_file", None)
+        self.setting_file = kwargs.get("setting_file")
 
     def action(self):
         self.reporter.add(StepInfo.INFO, "这是一个demo模块")

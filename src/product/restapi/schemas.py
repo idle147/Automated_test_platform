@@ -16,7 +16,7 @@ class ProductAddInfo(SchemaBase):
     required_fields = ["name", "price", "catagory"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
+        self._object_fields = {}
         self._name = None
         self._price = None
         self._catagory = None
@@ -55,7 +55,7 @@ class ProductInfo(SchemaBase):
     required_fields = ["id", "name", "price", "catagory"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
+        self._object_fields = {}
         self._id = None
         self._name = None
         self._price = None
@@ -103,8 +103,8 @@ class ProductInfoList(SchemaBase):
     required_fields = ["products"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
-        self._products = list()
+        self._object_fields = {}
+        self._products = []
         super().__init__(raw_json)
 
     @property
@@ -124,7 +124,7 @@ class ErrorResponse(SchemaBase):
     required_fields = ["message"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
+        self._object_fields = {}
         self._message = None
         super().__init__(raw_json)
 
@@ -145,7 +145,7 @@ class ProductProductPostResponse201(SchemaBase):
     required_fields = ["id"]
 
     def __init__(self, raw_json=None):
-        self._object_fields = dict()
+        self._object_fields = {}
         self._id = None
         super().__init__(raw_json)
 

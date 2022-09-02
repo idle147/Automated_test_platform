@@ -54,11 +54,7 @@ def get_test_list():
     """
     if runner is None or not runner.test_list_ready:
         return []
-    # 返回测试结果
-    ret = []
-    for test in runner.test_list.test_cases:
-        ret.append(test)
-    return ret
+    return list(runner.test_list.test_cases)
 
 
 def run_test():
